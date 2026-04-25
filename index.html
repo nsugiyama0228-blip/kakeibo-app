@@ -741,10 +741,7 @@
     </div>
     <div class="card animate-fadeup" style="animation-delay:.05s">
       <div class="section-title">月間カレンダー</div>
-      <div class="cal-header">
-        <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span>
-        <span style="color:#6366f1">土</span><span style="color:#ef4444">日</span>
-      </div>
+      <div class="cal-header" id="cal-header"></div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="cal-legend">
         <span><span style="color:var(--danger);font-weight:700">赤</span> 支出</span>
@@ -779,6 +776,20 @@
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="section-title">📅 週次予算の設定</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;max-width:360px;margin-bottom:10px">
+        <div class="form-row" style="flex:1">
+          <label>週の開始曜日</label>
+          <select id="week-start-select">
+            <option value="0">日曜始まり</option>
+            <option value="1">月曜始まり</option>
+            <option value="2">火曜始まり</option>
+            <option value="3">水曜始まり</option>
+            <option value="4">木曜始まり</option>
+            <option value="5">金曜始まり</option>
+            <option value="6">土曜始まり</option>
+          </select>
+        </div>
+      </div>
       <div style="display:flex;gap:10px;align-items:flex-end;max-width:360px">
         <div class="form-row" style="flex:1">
           <label>1週間の支出予算 (円)</label>
@@ -901,6 +912,7 @@ function getData() {
   if (!Array.isArray(d.deletedIds)) d.deletedIds = [];
   if (!d.budgets || typeof d.budgets !== 'object') d.budgets = JSON.parse(JSON.stringify(DEFAULT_BUDGETS));
   if (typeof d.weeklyBudget !== 'number') d.weeklyBudget = 0;
+  if (typeof d.weekStart !== 'number' || d.weekStart < 0 || d.weekStart > 6) d.weekStart = 1;
   if (!d.categories || typeof d.categories !== 'object') {
     d.categories = { expense: [...CATEGORIES_EXPENSE], income: [...CATEGORIES_INCOME] };
   } else {
@@ -1200,8 +1212,11 @@ function showTab(id) {
   if (id === 'tab-calendar') renderCalendarTab(getData());
   if (id === 'tab-settings') {
     renderSyncSettings();
+    const data = getData();
     const wb = document.getElementById('weekly-budget-input');
-    if (wb) wb.value = getData().weeklyBudget || '';
+    if (wb) wb.value = data.weeklyBudget || '';
+    const ws = document.getElementById('week-start-select');
+    if (ws) ws.value = String(data.weekStart ?? 1);
   }
 }
 
@@ -1283,17 +1298,18 @@ function fmtK(n) {
   return String(n);
 }
 
-let currentWeekDate = null; // 表示中の週の月曜日
+let currentWeekDate = null; // 表示中の週の開始日
 
-function todayMonday() {
+function todayWeekStart() {
   const today = new Date();
-  const diff  = (today.getDay() + 6) % 7;
+  const start = getData().weekStart ?? 1;
+  const diff  = (today.getDay() - start + 7) % 7;
   const m     = new Date(today);
   m.setDate(today.getDate() - diff); m.setHours(0,0,0,0);
   return m;
 }
 
-function initWeek() { currentWeekDate = todayMonday(); }
+function initWeek() { currentWeekDate = todayWeekStart(); }
 
 function changeWeek(d) {
   if (!currentWeekDate) initWeek();
@@ -1308,7 +1324,7 @@ function resetWeek() {
 }
 
 function isCurrentWeek() {
-  return currentWeekDate && currentWeekDate.getTime() === todayMonday().getTime();
+  return currentWeekDate && currentWeekDate.getTime() === todayWeekStart().getTime();
 }
 
 function getWeekRange() {
@@ -1319,8 +1335,22 @@ function getWeekRange() {
 }
 
 function renderCalendarTab(data) {
+  renderCalendarHeader(data);
   renderWeeklyBudget(data);
   renderCalendar(data);
+}
+
+function renderCalendarHeader(data) {
+  const start = data.weekStart ?? 1;
+  const DAYS = ['日','月','火','水','木','金','土'];
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const day = (start + i) % 7;
+    const color = day === 0 ? 'color:#ef4444' : day === 6 ? 'color:#6366f1' : '';
+    html += `<span${color ? ` style="${color}"` : ''}>${DAYS[day]}</span>`;
+  }
+  const el = document.getElementById('cal-header');
+  if (el) el.innerHTML = html;
 }
 
 function renderWeeklyBudget(data) {
@@ -1335,7 +1365,8 @@ function renderWeeklyBudget(data) {
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
   const fmt    = d => `${d.getMonth() + 1}/${d.getDate()}`;
 
-  document.getElementById('week-dates').textContent   = `${fmt(monday)}（月）〜 ${fmt(sunday)}（日）${isCurrentWeek() ? '・今週' : ''}`;
+  const DAY = ['日','月','火','水','木','金','土'];
+  document.getElementById('week-dates').textContent   = `${fmt(monday)}（${DAY[monday.getDay()]}）〜 ${fmt(sunday)}（${DAY[sunday.getDay()]}）${isCurrentWeek() ? '・今週' : ''}`;
   document.getElementById('week-expense').textContent = '¥' + weekExp.toLocaleString();
   document.getElementById('week-budget-val').textContent = budget > 0 ? '¥' + budget.toLocaleString() : '未設定';
   const remEl = document.getElementById('week-remain');
@@ -1354,8 +1385,9 @@ function renderWeeklyBudget(data) {
 
 function renderCalendar(data) {
   const y = currentYear, m = currentMonth;
+  const wkStart = data.weekStart ?? 1;
   const firstDow   = new Date(y, m - 1, 1).getDay();
-  const startOffset = (firstDow + 6) % 7;
+  const startOffset = (firstDow - wkStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
 
   const dailyExp = {}, dailyInc = {};
@@ -1437,12 +1469,16 @@ function deleteTxFromDay(id, dateStr) {
 }
 
 function saveWeeklyBudget() {
-  const v   = parseInt(document.getElementById('weekly-budget-input').value) || 0;
-  const msg = document.getElementById('weekly-budget-msg');
+  const v    = parseInt(document.getElementById('weekly-budget-input').value) || 0;
+  const wsEl = document.getElementById('week-start-select');
+  const ws   = wsEl ? parseInt(wsEl.value) : 1;
+  const msg  = document.getElementById('weekly-budget-msg');
   const data = getData();
   data.weeklyBudget = v;
+  if (ws >= 0 && ws <= 6) data.weekStart = ws;
   saveData(data);
-  msg.className = 'msg-area text-success'; msg.textContent = '週次予算を保存しました';
+  initWeek();
+  msg.className = 'msg-area text-success'; msg.textContent = '保存しました';
   schedulePush();
 }
 
@@ -1618,7 +1654,7 @@ async function pushToGist() {
   if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
   setSyncStatus('syncing');
   const data = getData();
-  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget };
+  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget, weekStart: data.weekStart };
   try {
     const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       method: 'PATCH',
@@ -1663,6 +1699,7 @@ function mergeRemoteData(remote) {
   if (remote.categories && typeof remote.categories === 'object') local.categories = remote.categories;
   if (remote.catIcons && typeof remote.catIcons === 'object') local.catIcons = remote.catIcons;
   if (typeof remote.weeklyBudget === 'number') local.weeklyBudget = remote.weeklyBudget;
+  if (typeof remote.weekStart === 'number' && remote.weekStart >= 0 && remote.weekStart <= 6) local.weekStart = remote.weekStart;
   saveData(local);
 }
 
