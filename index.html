@@ -211,6 +211,34 @@
       .summary-cards { grid-template-columns: 1fr; }
       .main-grid { grid-template-columns: 1fr; }
       #app { padding-bottom: 90px; }
+
+      /* 収支記録フォームを1列に */
+      .form-grid { grid-template-columns: 1fr; }
+      .form-full { grid-column: 1; }
+
+      /* 予算設定も1列に */
+      .budget-settings { grid-template-columns: 1fr; }
+      .budget-settings .form-row { flex-direction: column; align-items: flex-start; }
+      .budget-settings input { width: 100%; }
+
+      /* ユーザー設定モーダルのPIN入力行を折り返し */
+      .user-setting-row { flex-wrap: wrap; }
+      .user-setting-row .form-row { flex: 1 1 120px; min-width: 0; }
+      .user-setting-row .save-btn { width: 100%; margin-top: 4px; }
+
+      /* タブテキストを短く */
+      .tab-btn { font-size: .75rem; padding: 8px 2px; }
+
+      /* サマリーカードを横並び維持（3枚）*/
+      .summary-cards { grid-template-columns: repeat(3, 1fr); }
+      .summary-card { padding: 14px 10px; }
+      .card-value { font-size: 1.15rem; }
+    }
+
+    @media (max-width: 400px) {
+      /* 極小画面ではサマリーも1列 */
+      .summary-cards { grid-template-columns: 1fr; }
+      .card-value { font-size: 1.4rem; }
     }
 
     .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -.01em; }
