@@ -152,6 +152,17 @@
       background: var(--grad-primary); color: #fff; border-radius: 99px;
       padding: 5px 14px; font-size: .82rem; font-weight: 600;
       box-shadow: 0 2px 8px rgba(99,102,241,.35);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 140px; display: inline-block; vertical-align: middle;
+    }
+    header h1 { white-space: nowrap; }
+    .header-logo { min-width: 0; }
+    .header-right { flex-shrink: 0; }
+    @media (max-width: 480px) {
+      header { padding: 10px 14px; }
+      .user-badge { max-width: 90px; font-size: .76rem; padding: 4px 10px; }
+      .logout-btn { font-size: .76rem; padding: 4px 9px; }
+      .header-right { gap: 6px; }
     }
     .logout-btn {
       background: none; border: 1px solid var(--border); border-radius: 10px;
