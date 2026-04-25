@@ -342,6 +342,11 @@
       font-size: .82rem; padding: 4px 7px; border-radius: 8px; transition: all .15s;
     }
     .del-btn:hover { background: rgba(239,68,68,.1); color: var(--danger); }
+    .edit-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: .82rem; padding: 4px 7px; border-radius: 8px; transition: all .15s;
+    }
+    .edit-btn:hover { background: rgba(99,102,241,.1); color: var(--primary); }
 
     /* 予算バー */
     .budget-list { display: flex; flex-direction: column; gap: 14px; }
@@ -747,31 +752,44 @@
       </div>
       <div id="weekly-budget-msg" class="msg-area"></div>
     </div>
-    <div class="main-grid">
-      <div class="card">
-        <div class="section-title">PIN変更</div>
-        <div class="form-grid">
-          <div class="form-row form-full">
-            <label>現在のPIN</label>
-            <input type="password" id="old-pin" maxlength="4" placeholder="現在の4桁PIN" />
-          </div>
-          <div class="form-row form-full">
-            <label>新しいPIN</label>
-            <input type="password" id="new-pin" maxlength="4" placeholder="新しい4桁PIN" />
-          </div>
-          <div class="form-row form-full">
-            <label>確認</label>
-            <input type="password" id="confirm-pin" maxlength="4" placeholder="もう一度入力" />
-          </div>
+    <div class="card">
+      <div class="section-title">月次予算の設定</div>
+      <div class="budget-settings" id="budget-settings"></div>
+      <button class="submit-btn" onclick="saveBudgets()" style="margin-top:14px">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 取引編集モーダル ===== -->
+<div class="modal-overlay" id="editTxModal" onclick="closeModal('editTxModal')">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <button class="modal-close-btn" onclick="closeModal('editTxModal')">✕</button>
+    <div class="modal-title">✏️ 取引を編集</div>
+    <div class="modal-scroll">
+      <div class="type-toggle">
+        <button class="active expense" id="edit-btn-expense" onclick="setEditType('expense')">💸 支出</button>
+        <button class="income" id="edit-btn-income" onclick="setEditType('income')">💰 収入</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>日付</label>
+          <input type="date" id="edit-tx-date" />
         </div>
-        <button class="submit-btn" onclick="changePin()">PINを変更</button>
-        <div id="pin-change-msg" class="msg-area"></div>
+        <div class="form-row">
+          <label>金額 (円)</label>
+          <input type="number" id="edit-tx-amount" min="0" />
+        </div>
+        <div class="form-row">
+          <label>カテゴリ</label>
+          <select id="edit-tx-category"></select>
+        </div>
+        <div class="form-row">
+          <label>メモ</label>
+          <input type="text" id="edit-tx-note" />
+        </div>
       </div>
-      <div class="card">
-        <div class="section-title">月次予算の設定</div>
-        <div class="budget-settings" id="budget-settings"></div>
-        <button class="submit-btn" onclick="saveBudgets()" style="margin-top:14px">保存</button>
-      </div>
+      <button class="submit-btn" onclick="saveEditTx()">保存</button>
     </div>
   </div>
 </div>
@@ -924,6 +942,10 @@ function changeMonth(d) {
   if (currentMonth > 12) { currentMonth = 1; currentYear++; }
   if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
   renderAll();
+  const calTab = document.getElementById('tab-calendar');
+  if (calTab && calTab.style.display !== 'none') renderCalendarTab(getData());
+  const chartTab = document.getElementById('tab-chart');
+  if (chartTab && chartTab.style.display !== 'none') renderCharts(getData());
 }
 
 function setType(t) {
@@ -987,7 +1009,8 @@ function renderTxList(txs, data) {
       </div>
       <div class="tx-right">
         <span class="tx-amount ${t.type==='income'?'income':'expense'}">${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}</span>
-        <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')">✕</button>
+        <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
+        <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')" title="削除">✕</button>
       </div>
     </div>`).join('');
 }
@@ -995,19 +1018,31 @@ function renderTxList(txs, data) {
 function renderBudget(txs, data) {
   const el = document.getElementById('budget-list');
   const expTxs = txs.filter(t => t.type === 'expense');
-  el.innerHTML = data.categories.expense.map(cat => {
+  const visibleCats = data.categories.expense.filter(cat => {
+    const budget = data.budgets[cat] || 0;
+    const spent  = expTxs.filter(t => t.category === cat).reduce((s,t) => s + t.amount, 0);
+    return budget > 0 || spent > 0;
+  });
+  if (!visibleCats.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div>設定タブから予算を設定してください</div>';
+    return;
+  }
+  el.innerHTML = visibleCats.map(cat => {
     const budget = data.budgets[cat] || 0;
     const spent  = expTxs.filter(t => t.category === cat).reduce((s,t) => s + t.amount, 0);
     const pct    = budget > 0 ? Math.min(spent / budget * 100, 100) : 0;
     const rawPct = budget > 0 ? Math.round(spent / budget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    const amountText = budget > 0
+      ? `¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}`
+      : `¥${spent.toLocaleString()}（予算未設定）`;
     return `<div class="budget-row">
       <div class="budget-labels">
-        <span class="budget-cat"><span class="cat-icon">${data.catIcons[cat]||CAT_ICONS[cat]||''}</span>${cat}</span>
+        <span class="budget-cat"><span class="cat-icon">${data.catIcons[cat]||CAT_ICONS[cat]||''}</span>${escHtml(cat)}</span>
         <span style="display:flex;align-items:center;gap:6px">
-          <span class="budget-amounts">¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}</span>
-          <span class="budget-pct ${pctCls}">${rawPct}%</span>
+          <span class="budget-amounts">${amountText}</span>
+          ${budget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
         </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
@@ -1017,10 +1052,10 @@ function renderBudget(txs, data) {
 
 function renderBudgetSettings(data) {
   const el = document.getElementById('budget-settings');
-  el.innerHTML = data.categories.expense.map(cat => `
+  el.innerHTML = data.categories.expense.map((cat, i) => `
     <div class="form-row">
-      <label>${data.catIcons[cat]||CAT_ICONS[cat]||''} ${cat}</label>
-      <input type="number" id="budget-${escHtml(cat)}" value="${data.budgets[cat] || 0}" min="0" />
+      <label>${data.catIcons[cat]||CAT_ICONS[cat]||''} ${escHtml(cat)}</label>
+      <input type="number" id="budget-idx-${i}" value="${data.budgets[cat] || 0}" min="0" />
     </div>`).join('');
 }
 
@@ -1083,7 +1118,7 @@ function addTransaction() {
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-note').value   = '';
   renderAll();
-  pushToGist();
+  schedulePush();
 }
 
 function deleteTx(id) {
@@ -1091,34 +1126,20 @@ function deleteTx(id) {
   const data = getData();
   data.transactions = data.transactions.filter(t => t.id !== id);
   if (!data.deletedIds.includes(id)) data.deletedIds.push(id);
+  if (data.deletedIds.length > 500) data.deletedIds = data.deletedIds.slice(-500);
   saveData(data); renderAll();
-  pushToGist();
+  schedulePush();
 }
 
 function saveBudgets() {
   const data = getData();
-  data.categories.expense.forEach(cat => {
-    const el = document.getElementById('budget-' + cat);
+  data.categories.expense.forEach((cat, i) => {
+    const el = document.getElementById('budget-idx-' + i);
     if (el) data.budgets[cat] = parseInt(el.value) || 0;
   });
   saveData(data); renderAll();
   alert('予算を保存しました');
-  pushToGist();
-}
-
-function changePin() {
-  const old = document.getElementById('old-pin').value;
-  const nw  = document.getElementById('new-pin').value;
-  const cnf = document.getElementById('confirm-pin').value;
-  const msg = document.getElementById('pin-change-msg');
-  const data = getData();
-  if (data.users[currentUser].pin !== old) { msg.className='msg-area text-danger'; msg.textContent='現在のPINが違います'; return; }
-  if (!/^\d{4}$/.test(nw))                 { msg.className='msg-area text-danger'; msg.textContent='PINは4桁の数字です'; return; }
-  if (nw !== cnf)                          { msg.className='msg-area text-danger'; msg.textContent='新しいPINが一致しません'; return; }
-  data.users[currentUser].pin = nw;
-  saveData(data);
-  msg.className = 'msg-area text-success'; msg.textContent = 'PINを変更しました';
-  ['old-pin','new-pin','confirm-pin'].forEach(id => document.getElementById(id).value = '');
+  schedulePush();
 }
 
 function showTab(id) {
@@ -1315,7 +1336,8 @@ function showDayDetail(dateStr) {
           </div>
           <div class="tx-right">
             <span class="tx-amount ${t.type==='income'?'income':'expense'}">${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}</span>
-            <button class="del-btn" onclick="deleteTxFromDay('${escHtml(t.id)}','${escHtml(dateStr)}')">✕</button>
+            <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
+            <button class="del-btn" onclick="deleteTxFromDay('${escHtml(t.id)}','${escHtml(dateStr)}')" title="削除">✕</button>
           </div>
         </div>`).join('')}`;
   }
@@ -1327,7 +1349,8 @@ function deleteTxFromDay(id, dateStr) {
   const data = getData();
   data.transactions = data.transactions.filter(t => t.id !== id);
   if (!data.deletedIds.includes(id)) data.deletedIds.push(id);
-  saveData(data); renderAll(); pushToGist();
+  if (data.deletedIds.length > 500) data.deletedIds = data.deletedIds.slice(-500);
+  saveData(data); renderAll(); schedulePush();
   const remaining = getData().transactions.filter(t => t.date === dateStr);
   if (remaining.length === 0) closeModal('dayModal');
   else showDayDetail(dateStr);
@@ -1340,7 +1363,66 @@ function saveWeeklyBudget() {
   data.weeklyBudget = v;
   saveData(data);
   msg.className = 'msg-area text-success'; msg.textContent = '週次予算を保存しました';
-  pushToGist();
+  schedulePush();
+}
+
+// ===== 取引編集 =====
+let editingTxId = null;
+let editTxType  = 'expense';
+
+function openEditTxModal(id) {
+  const data = getData();
+  const tx   = data.transactions.find(t => t.id === id);
+  if (!tx) return;
+  editingTxId = id;
+  setEditType(tx.type);
+  document.getElementById('edit-tx-date').value   = tx.date;
+  document.getElementById('edit-tx-amount').value = tx.amount;
+  document.getElementById('edit-tx-note').value   = tx.note || '';
+  const sel = document.getElementById('edit-tx-category');
+  if (![...sel.options].some(o => o.value === tx.category)) {
+    const opt = document.createElement('option');
+    opt.value = tx.category;
+    opt.textContent = (data.catIcons[tx.category] || CAT_ICONS[tx.category] || '') + ' ' + tx.category + '（削除済み）';
+    sel.appendChild(opt);
+  }
+  sel.value = tx.category;
+  openModal('editTxModal');
+}
+
+function setEditType(t) {
+  editTxType = t;
+  const eExp = document.getElementById('edit-btn-expense');
+  const eInc = document.getElementById('edit-btn-income');
+  eExp.classList.toggle('active',  t === 'expense');
+  eExp.classList.toggle('expense', t === 'expense');
+  eInc.classList.toggle('active',  t === 'income');
+  eInc.classList.toggle('income',  t === 'income');
+  const data = getData();
+  const sel  = document.getElementById('edit-tx-category');
+  const cats = t === 'expense' ? data.categories.expense : data.categories.income;
+  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${escHtml(c)}</option>`).join('');
+}
+
+function saveEditTx() {
+  if (!editingTxId) return;
+  const date     = document.getElementById('edit-tx-date').value;
+  const amount   = parseInt(document.getElementById('edit-tx-amount').value);
+  const category = document.getElementById('edit-tx-category').value;
+  const note     = document.getElementById('edit-tx-note').value.trim();
+  if (!date || !amount || amount <= 0) { alert('日付と正の金額を入力してください'); return; }
+  const data = getData();
+  const tx   = data.transactions.find(t => t.id === editingTxId);
+  if (!tx) { closeModal('editTxModal'); return; }
+  tx.date = date; tx.amount = amount; tx.category = category; tx.note = note; tx.type = editTxType;
+  saveData(data);
+  closeModal('editTxModal');
+  const wasOnDayModal = document.getElementById('dayModal').classList.contains('open');
+  const dateStr = tx.date;
+  editingTxId = null;
+  renderAll();
+  if (wasOnDayModal) showDayDetail(dateStr);
+  schedulePush();
 }
 
 // ===== カテゴリ管理 =====
@@ -1389,6 +1471,8 @@ function addCat() {
   const icon   = iconEl.value.trim();
   const name   = nameEl.value.trim();
   if (!name) { msg.className = 'msg-area text-danger'; msg.textContent = 'カテゴリ名を入力してください'; return; }
+  if (name.length > 20) { msg.className = 'msg-area text-danger'; msg.textContent = 'カテゴリ名は20文字以内です'; return; }
+  if (/[<>"'&|]/.test(name)) { msg.className = 'msg-area text-danger'; msg.textContent = '使えない記号が含まれています'; return; }
   const data = getData();
   if (data.categories[currentCatTab].includes(name)) {
     msg.className = 'msg-area text-danger'; msg.textContent = '同じ名前のカテゴリが既にあります'; return;
@@ -1402,7 +1486,7 @@ function addCat() {
   renderCatList();
   updateCategorySelect();
   renderBudgetSettings(getData());
-  pushToGist();
+  schedulePush();
 }
 
 function deleteCat(idx) {
@@ -1420,7 +1504,7 @@ function deleteCat(idx) {
   renderCatList();
   updateCategorySelect();
   renderAll();
-  pushToGist();
+  schedulePush();
 }
 
 // ===== データ同期 (GitHub Gist) =====
@@ -1439,9 +1523,19 @@ function setSyncStatus(s, msg) {
   el.title = msg || (s === 'ok' ? '同期済み' : s === 'error' ? '同期エラー' : s === 'syncing' ? '同期中...' : '');
 }
 
+let pushTimer = null;
+function schedulePush() {
+  const cfg = getSyncConfig();
+  if (!cfg.token || !cfg.gistId) return;
+  if (pushTimer) clearTimeout(pushTimer);
+  setSyncStatus('syncing');
+  pushTimer = setTimeout(() => { pushTimer = null; pushToGist(); }, 1500);
+}
+
 async function pushToGist() {
   const cfg = getSyncConfig();
   if (!cfg.token || !cfg.gistId) return;
+  if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
   setSyncStatus('syncing');
   const data = getData();
   const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget };
