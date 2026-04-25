@@ -356,17 +356,16 @@
     .budget-settings label { min-width: 84px; color: var(--text); font-size: .85rem; font-weight: 500; }
     .budget-settings input { width: 110px; }
 
-    /* モーダル（トランザクション追加用 - モバイル） */
+    /* モーダル */
     .modal-overlay {
       display: none; position: fixed; inset: 0; z-index: 100;
       background: rgba(15,23,42,.5); backdrop-filter: blur(4px);
-      animation: fadeIn .2s ease;
     }
-    .modal-overlay.open { display: flex; align-items: flex-end; justify-content: center; }
+    .modal-overlay.open { display: flex; align-items: flex-end; justify-content: center; animation: fadeIn .2s ease; }
+    .modal-overlay.open .modal-sheet { animation: fadeUp .3s ease; }
     .modal-sheet {
       background: var(--card); border-radius: 24px 24px 0 0; width: 100%; max-width: 500px;
       padding: 16px 24px 32px; box-shadow: 0 -8px 40px rgba(0,0,0,.2);
-      animation: fadeUp .3s ease;
     }
     .modal-handle {
       width: 40px; height: 4px; border-radius: 99px; background: var(--border);
@@ -454,6 +453,7 @@
       <button class="pin-key" onclick="pinInput('7')">7</button>
       <button class="pin-key" onclick="pinInput('8')">8</button>
       <button class="pin-key" onclick="pinInput('9')">9</button>
+      <div></div>
       <button class="pin-key" onclick="pinInput('0')">0</button>
       <button class="pin-key del" onclick="pinDel()">⌫</button>
     </div>
@@ -632,9 +632,26 @@ const CATEGORIES_INCOME  = ['給与','副収入','ボーナス','その他収入
 const DEFAULT_BUDGETS = { '食費':40000,'交通費':10000,'光熱費':15000,'住居費':80000,'通信費':8000,'医療費':5000,'娯楽費':10000,'衣服費':5000,'教育費':5000,'その他':5000 };
 const DEFAULT_PIN = '1234';
 
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function getData() {
-  return JSON.parse(localStorage.getItem('kakeibo_data') || 'null') ||
-    { users: { user1: { name:'ユーザー1', pin: DEFAULT_PIN }, user2: { name:'ユーザー2', pin: DEFAULT_PIN } }, transactions: [], budgets: JSON.parse(JSON.stringify(DEFAULT_BUDGETS)) };
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem('kakeibo_data')); } catch(e) {}
+  if (!d || typeof d !== 'object') d = {};
+  if (!d.users || typeof d.users !== 'object') d.users = {};
+  if (!d.users.user1 || typeof d.users.user1 !== 'object') d.users.user1 = {};
+  if (!d.users.user2 || typeof d.users.user2 !== 'object') d.users.user2 = {};
+  if (!d.users.user1.name) d.users.user1.name = 'ユーザー1';
+  if (!d.users.user2.name) d.users.user2.name = 'ユーザー2';
+  if (!d.users.user1.pin)  d.users.user1.pin  = DEFAULT_PIN;
+  if (!d.users.user2.pin)  d.users.user2.pin  = DEFAULT_PIN;
+  if (!Array.isArray(d.transactions)) d.transactions = [];
+  if (!d.budgets || typeof d.budgets !== 'object') d.budgets = JSON.parse(JSON.stringify(DEFAULT_BUDGETS));
+  return d;
 }
 function saveData(d) { localStorage.setItem('kakeibo_data', JSON.stringify(d)); }
 
@@ -684,6 +701,8 @@ function verifyPin() {
 }
 
 function logout() {
+  document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+  document.body.style.overflow = '';
   pinBuffer = ''; updateDots();
   document.getElementById('pin-error').textContent = '';
   document.getElementById('pin-screen').style.display = 'flex';
@@ -763,13 +782,13 @@ function renderTxList(txs, data) {
   el.innerHTML = sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
-        <span class="tx-cat-badge">${CAT_ICONS[t.category] || ''}${t.category}</span>
-        <span class="tx-note">${t.note || '（メモなし）'}</span>
-        <span class="tx-meta">${t.date} · ${data.users[t.user]?.name || t.user}</span>
+        <span class="tx-cat-badge">${CAT_ICONS[t.category] || ''}${escHtml(t.category)}</span>
+        <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
+        <span class="tx-meta">${escHtml(t.date)} · ${escHtml(data.users[t.user]?.name || t.user)}</span>
       </div>
       <div class="tx-right">
-        <span class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}</span>
-        <button class="del-btn" onclick="deleteTx('${t.id}')">✕</button>
+        <span class="tx-amount ${t.type==='income'?'income':'expense'}">${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}</span>
+        <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')">✕</button>
       </div>
     </div>`).join('');
 }
@@ -928,11 +947,11 @@ function renderUserSettings() {
     const label = uid === 'user1' ? '👤 ユーザー1' : '👤 ユーザー2';
     return `
     <div class="user-setting-section">
-      <div class="user-setting-title">${label}（現在: ${u.name}）</div>
+      <div class="user-setting-title" id="user-title-${uid}">${escHtml(label)}（現在: ${escHtml(u.name)}）</div>
       <div class="user-setting-row">
         <div class="form-row">
           <label>表示名</label>
-          <input type="text" id="name-${uid}" value="${u.name}" maxlength="20" placeholder="名前を入力" />
+          <input type="text" id="name-${uid}" value="${escHtml(u.name)}" maxlength="20" placeholder="名前を入力" />
         </div>
         <button class="save-btn" onclick="updateUserName('${uid}')">保存</button>
       </div>
@@ -967,11 +986,14 @@ function updateUserName(uid) {
   data.users[uid].name = name;
   saveData(data);
   msg.className = 'msg-area text-success'; msg.textContent = '名前を変更しました';
+  // タイトルのみ更新（再描画するとメッセージが即消えるため）
+  const label = uid === 'user1' ? '👤 ユーザー1' : '👤 ユーザー2';
+  const titleEl = document.getElementById('user-title-' + uid);
+  if (titleEl) titleEl.textContent = label + '（現在: ' + name + '）';
   if (uid === currentUser) {
     document.getElementById('current-user-label').textContent = name;
     document.getElementById('btn-' + uid).textContent = '👤 ' + name;
   }
-  renderUserSettings();
 }
 
 function updateUserPin(uid) {
