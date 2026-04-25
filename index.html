@@ -507,6 +507,24 @@
     .cal-exp { font-size: .62rem; font-weight: 700; color: var(--danger); line-height: 1.2; }
     .cal-inc { font-size: .62rem; font-weight: 700; color: var(--success); line-height: 1.2; }
     .cal-legend { margin-top: 10px; font-size: .75rem; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+
+    /* ===== カテゴリ管理 ===== */
+    .cat-type-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+    .cat-type-btn {
+      flex: 1; padding: 9px; border: 1.5px solid var(--border); border-radius: 10px;
+      background: var(--bg); cursor: pointer; font-size: .85rem; font-weight: 500;
+      color: var(--muted); font-family: inherit; transition: all .2s;
+    }
+    .cat-type-btn.active { border-color: var(--primary); background: rgba(99,102,241,.08); color: var(--primary); font-weight: 700; }
+    .cat-manage-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 4px; border-bottom: 1px solid var(--border);
+    }
+    .cat-manage-item:last-child { border-bottom: none; }
+    .cat-manage-icon { font-size: 1.15rem; width: 28px; text-align: center; flex-shrink: 0; }
+    .cat-manage-name { flex: 1; font-size: .9rem; font-weight: 500; }
+    .cat-add-row { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+    .cat-icon-input { width: 52px; text-align: center; font-size: 1.1rem; padding: 9px 4px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -710,6 +728,13 @@
         </div>
         <span class="setting-arrow">›</span>
       </div>
+      <div class="setting-item" onclick="openCatModal()">
+        <div class="setting-item-left">
+          <div class="setting-item-icon" style="background:var(--grad-income)">🏷️</div>
+          <span>カテゴリ管理</span>
+        </div>
+        <span class="setting-arrow">›</span>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div class="section-title">📅 週次予算の設定</div>
@@ -761,6 +786,22 @@
   </div>
 </div>
 
+<!-- ===== カテゴリ管理モーダル ===== -->
+<div class="modal-overlay" id="catModal" onclick="closeModal('catModal')">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <button class="modal-close-btn" onclick="closeModal('catModal')">✕</button>
+    <div class="modal-title">🏷️ カテゴリ管理</div>
+    <div class="modal-scroll">
+      <div class="cat-type-tabs">
+        <button class="cat-type-btn active" id="cat-tab-expense" onclick="switchCatTab('expense')">💸 支出</button>
+        <button class="cat-type-btn" id="cat-tab-income" onclick="switchCatTab('income')">💰 収入</button>
+      </div>
+      <div id="cat-list-content"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== ユーザー設定モーダル ===== -->
 <div class="modal-overlay" id="userModal" onclick="closeModal('userModal')">
   <div class="modal-sheet" onclick="event.stopPropagation()">
@@ -800,6 +841,13 @@ function getData() {
   if (!Array.isArray(d.deletedIds)) d.deletedIds = [];
   if (!d.budgets || typeof d.budgets !== 'object') d.budgets = JSON.parse(JSON.stringify(DEFAULT_BUDGETS));
   if (typeof d.weeklyBudget !== 'number') d.weeklyBudget = 0;
+  if (!d.categories || typeof d.categories !== 'object') {
+    d.categories = { expense: [...CATEGORIES_EXPENSE], income: [...CATEGORIES_INCOME] };
+  } else {
+    if (!Array.isArray(d.categories.expense)) d.categories.expense = [...CATEGORIES_EXPENSE];
+    if (!Array.isArray(d.categories.income))  d.categories.income  = [...CATEGORIES_INCOME];
+  }
+  if (!d.catIcons || typeof d.catIcons !== 'object') d.catIcons = Object.assign({}, CAT_ICONS);
   return d;
 }
 function saveData(d) { localStorage.setItem('kakeibo_data', JSON.stringify(d)); }
@@ -888,9 +936,10 @@ function setType(t) {
 }
 
 function updateCategorySelect() {
-  const sel = document.getElementById('tx-category');
-  const cats = currentType === 'expense' ? CATEGORIES_EXPENSE : CATEGORIES_INCOME;
-  sel.innerHTML = cats.map(c => `<option value="${c}">${CAT_ICONS[c] || ''} ${c}</option>`).join('');
+  const sel  = document.getElementById('tx-category');
+  const data = getData();
+  const cats = currentType === 'expense' ? data.categories.expense : data.categories.income;
+  sel.innerHTML = cats.map(c => `<option value="${c}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${c}</option>`).join('');
 }
 
 function setAmount(v) {
@@ -932,7 +981,7 @@ function renderTxList(txs, data) {
   el.innerHTML = sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
-        <span class="tx-cat-badge">${CAT_ICONS[t.category] || ''}${escHtml(t.category)}</span>
+        <span class="tx-cat-badge">${data.catIcons[t.category] || CAT_ICONS[t.category] || ''}${escHtml(t.category)}</span>
         <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
         <span class="tx-meta">${escHtml(t.date)} · ${escHtml(data.users[t.user]?.name || t.user)}</span>
       </div>
@@ -946,7 +995,7 @@ function renderTxList(txs, data) {
 function renderBudget(txs, data) {
   const el = document.getElementById('budget-list');
   const expTxs = txs.filter(t => t.type === 'expense');
-  el.innerHTML = CATEGORIES_EXPENSE.map(cat => {
+  el.innerHTML = data.categories.expense.map(cat => {
     const budget = data.budgets[cat] || 0;
     const spent  = expTxs.filter(t => t.category === cat).reduce((s,t) => s + t.amount, 0);
     const pct    = budget > 0 ? Math.min(spent / budget * 100, 100) : 0;
@@ -955,7 +1004,7 @@ function renderBudget(txs, data) {
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
     return `<div class="budget-row">
       <div class="budget-labels">
-        <span class="budget-cat"><span class="cat-icon">${CAT_ICONS[cat]||''}</span>${cat}</span>
+        <span class="budget-cat"><span class="cat-icon">${data.catIcons[cat]||CAT_ICONS[cat]||''}</span>${cat}</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span class="budget-amounts">¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}</span>
           <span class="budget-pct ${pctCls}">${rawPct}%</span>
@@ -968,10 +1017,10 @@ function renderBudget(txs, data) {
 
 function renderBudgetSettings(data) {
   const el = document.getElementById('budget-settings');
-  el.innerHTML = CATEGORIES_EXPENSE.map(cat => `
+  el.innerHTML = data.categories.expense.map(cat => `
     <div class="form-row">
-      <label>${CAT_ICONS[cat]||''} ${cat}</label>
-      <input type="number" id="budget-${cat}" value="${data.budgets[cat] || 0}" min="0" />
+      <label>${data.catIcons[cat]||CAT_ICONS[cat]||''} ${cat}</label>
+      <input type="number" id="budget-${escHtml(cat)}" value="${data.budgets[cat] || 0}" min="0" />
     </div>`).join('');
 }
 
@@ -1048,9 +1097,9 @@ function deleteTx(id) {
 
 function saveBudgets() {
   const data = getData();
-  CATEGORIES_EXPENSE.forEach(cat => {
-    const v = parseInt(document.getElementById('budget-' + cat).value) || 0;
-    data.budgets[cat] = v;
+  data.categories.expense.forEach(cat => {
+    const el = document.getElementById('budget-' + cat);
+    if (el) data.budgets[cat] = parseInt(el.value) || 0;
   });
   saveData(data); renderAll();
   alert('予算を保存しました');
@@ -1260,7 +1309,7 @@ function showDayDetail(dateStr) {
       ${txs.map(t => `
         <div class="tx-item">
           <div class="tx-left">
-            <span class="tx-cat-badge">${CAT_ICONS[t.category]||''}${escHtml(t.category)}</span>
+            <span class="tx-cat-badge">${data.catIcons[t.category]||CAT_ICONS[t.category]||''}${escHtml(t.category)}</span>
             <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
             <span class="tx-meta">${escHtml(data.users[t.user]?.name || t.user)}</span>
           </div>
@@ -1294,6 +1343,86 @@ function saveWeeklyBudget() {
   pushToGist();
 }
 
+// ===== カテゴリ管理 =====
+let currentCatTab = 'expense';
+
+function openCatModal() {
+  currentCatTab = 'expense';
+  document.getElementById('cat-tab-expense').classList.add('active');
+  document.getElementById('cat-tab-income').classList.remove('active');
+  renderCatList();
+  openModal('catModal');
+}
+
+function switchCatTab(type) {
+  currentCatTab = type;
+  document.getElementById('cat-tab-expense').classList.toggle('active', type === 'expense');
+  document.getElementById('cat-tab-income').classList.toggle('active', type === 'income');
+  renderCatList();
+}
+
+function renderCatList() {
+  const data = getData();
+  const cats = data.categories[currentCatTab];
+  const el   = document.getElementById('cat-list-content');
+  el.innerHTML = `
+    <div id="cat-items">
+      ${cats.map((cat, i) => `
+        <div class="cat-manage-item">
+          <span class="cat-manage-icon">${data.catIcons[cat] || CAT_ICONS[cat] || '📦'}</span>
+          <span class="cat-manage-name">${escHtml(cat)}</span>
+          <button class="del-btn" onclick="deleteCat(${i})"${cats.length <= 1 ? ' disabled title="最低1つ必要です"' : ''}>✕</button>
+        </div>`).join('')}
+    </div>
+    <div class="cat-add-row">
+      <input type="text" id="new-cat-icon" maxlength="2" placeholder="🏷️" class="cat-icon-input" />
+      <input type="text" id="new-cat-name" placeholder="カテゴリ名を入力" style="flex:1;min-width:120px" maxlength="20" />
+      <button class="save-btn" onclick="addCat()">追加</button>
+    </div>
+    <div id="cat-msg" class="msg-area"></div>`;
+}
+
+function addCat() {
+  const iconEl = document.getElementById('new-cat-icon');
+  const nameEl = document.getElementById('new-cat-name');
+  const msg    = document.getElementById('cat-msg');
+  const icon   = iconEl.value.trim();
+  const name   = nameEl.value.trim();
+  if (!name) { msg.className = 'msg-area text-danger'; msg.textContent = 'カテゴリ名を入力してください'; return; }
+  const data = getData();
+  if (data.categories[currentCatTab].includes(name)) {
+    msg.className = 'msg-area text-danger'; msg.textContent = '同じ名前のカテゴリが既にあります'; return;
+  }
+  data.categories[currentCatTab].push(name);
+  if (icon) data.catIcons[name] = icon;
+  if (currentCatTab === 'expense' && data.budgets[name] === undefined) data.budgets[name] = 0;
+  saveData(data);
+  iconEl.value = ''; nameEl.value = '';
+  msg.className = 'msg-area text-success'; msg.textContent = `「${escHtml(name)}」を追加しました`;
+  renderCatList();
+  updateCategorySelect();
+  renderBudgetSettings(getData());
+  pushToGist();
+}
+
+function deleteCat(idx) {
+  const data = getData();
+  const cats = data.categories[currentCatTab];
+  if (cats.length <= 1) return;
+  const name  = cats[idx];
+  const hasTx = data.transactions.some(t => t.category === name);
+  const msg   = hasTx
+    ? `「${name}」を使っている取引があります。\nカテゴリを削除しますか？（取引データは残ります）`
+    : `「${name}」を削除しますか？`;
+  if (!confirm(msg)) return;
+  data.categories[currentCatTab].splice(idx, 1);
+  saveData(data);
+  renderCatList();
+  updateCategorySelect();
+  renderAll();
+  pushToGist();
+}
+
 // ===== データ同期 (GitHub Gist) =====
 const SYNC_KEY = 'kakeibo_sync';
 
@@ -1315,7 +1444,7 @@ async function pushToGist() {
   if (!cfg.token || !cfg.gistId) return;
   setSyncStatus('syncing');
   const data = getData();
-  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds };
+  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget };
   try {
     const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       method: 'PATCH',
@@ -1357,6 +1486,9 @@ function mergeRemoteData(remote) {
   local.transactions = Object.values(txMap);
   local.deletedIds = [...deletedSet];
   if (remote.budgets && typeof remote.budgets === 'object') local.budgets = remote.budgets;
+  if (remote.categories && typeof remote.categories === 'object') local.categories = remote.categories;
+  if (remote.catIcons && typeof remote.catIcons === 'object') local.catIcons = remote.catIcons;
+  if (typeof remote.weeklyBudget === 'number') local.weeklyBudget = remote.weeklyBudget;
   saveData(local);
 }
 
