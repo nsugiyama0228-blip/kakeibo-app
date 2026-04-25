@@ -4,180 +4,388 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>家計管理アプリ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --primary: #4f8ef7;
-      --primary-dark: #3370d4;
-      --accent: #f7c948;
-      --danger: #e05454;
-      --success: #3cba6e;
-      --bg: #f4f6fb;
-      --card: #fff;
-      --text: #2d2d2d;
-      --muted: #7a8093;
-      --border: #e3e8f0;
-      --radius: 12px;
+      --primary:       #6366f1;
+      --primary-dark:  #4f46e5;
+      --primary-light: #a5b4fc;
+      --violet:        #8b5cf6;
+      --pink:          #ec4899;
+      --accent:        #f59e0b;
+      --danger:        #ef4444;
+      --success:       #10b981;
+      --bg:            #f1f5f9;
+      --card:          #ffffff;
+      --text:          #1e293b;
+      --muted:         #64748b;
+      --border:        #e2e8f0;
+      --radius:        16px;
+      --radius-lg:     24px;
+      --shadow-sm:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+      --shadow:        0 4px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+      --shadow-lg:     0 10px 40px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.08);
+      --glow-primary:  0 0 0 3px rgba(99,102,241,.25);
+      --glow-success:  0 0 0 3px rgba(16,185,129,.25);
+      --glow-danger:   0 0 0 3px rgba(239,68,68,.25);
+      --grad-primary:  linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+      --grad-income:   linear-gradient(135deg, #10b981 0%, #34d399 100%);
+      --grad-expense:  linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+      --grad-balance:  linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+      --grad-hero:     linear-gradient(145deg, #4f46e5 0%, #7c3aed 45%, #ec4899 100%);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', 'Hiragino Sans', sans-serif; background: var(--bg); color: var(--text); }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:     #0f172a;
+        --card:   #1e293b;
+        --text:   #f1f5f9;
+        --muted:  #94a3b8;
+        --border: #334155;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+        --shadow:    0 4px 16px rgba(0,0,0,.4);
+        --shadow-lg: 0 10px 40px rgba(0,0,0,.5);
+      }
+    }
 
-    /* ---- PIN画面 ---- */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+      background: var(--bg); color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== アニメーション ===== */
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+    @keyframes pulse    { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+    @keyframes shake    { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-6px)} 40%,80%{transform:translateX(6px)} }
+    @keyframes scaleIn  { from { opacity:0; transform:scale(.92); } to { opacity:1; transform:scale(1); } }
+    @keyframes dotPop   { 0%{transform:scale(1)} 50%{transform:scale(1.4)} 100%{transform:scale(1)} }
+    @keyframes barPulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+
+    .animate-fadeup   { animation: fadeUp .35s ease both; }
+    .animate-scalein  { animation: scaleIn .25s ease both; }
+
+    /* ===== PIN画面 ===== */
     #pin-screen {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      min-height: 100vh; background: linear-gradient(135deg, #4f8ef7 0%, #7b5ea7 100%);
+      min-height: 100vh; background: var(--grad-hero); padding: 24px;
+      position: relative; overflow: hidden;
     }
-    #pin-screen h1 { color: #fff; font-size: 1.8rem; margin-bottom: 8px; }
-    #pin-screen p { color: rgba(255,255,255,.75); margin-bottom: 24px; font-size: .95rem; }
-    .pin-box { background: #fff; border-radius: 20px; padding: 32px 28px; box-shadow: 0 8px 32px rgba(0,0,0,.18); min-width: 300px; }
-    .user-select { display: flex; gap: 12px; margin-bottom: 20px; }
+    #pin-screen::before, #pin-screen::after {
+      content: ''; position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,.06); pointer-events: none;
+    }
+    #pin-screen::before { width: 400px; height: 400px; top: -120px; right: -80px; }
+    #pin-screen::after  { width: 300px; height: 300px; bottom: -80px; left: -60px; }
+
+    .pin-logo-wrap {
+      width: 72px; height: 72px; border-radius: 22px; margin-bottom: 16px;
+      background: rgba(255,255,255,.2); backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; box-shadow: 0 8px 24px rgba(0,0,0,.2);
+      animation: scaleIn .4s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    #pin-screen h1 {
+      color: #fff; font-size: 1.75rem; font-weight: 800; letter-spacing: -.02em;
+      margin-bottom: 6px;
+    }
+    #pin-screen > p { color: rgba(255,255,255,.75); margin-bottom: 28px; font-size: .95rem; }
+
+    .pin-box {
+      background: var(--card); border-radius: var(--radius-lg); padding: 32px 28px;
+      box-shadow: var(--shadow-lg); min-width: 320px; max-width: 360px; width: 100%;
+      animation: fadeUp .4s ease .1s both;
+    }
+    .user-select { display: flex; gap: 10px; margin-bottom: 24px; }
     .user-btn {
-      flex: 1; padding: 10px; border: 2px solid var(--border); border-radius: 10px;
-      background: #f4f6fb; cursor: pointer; font-size: .95rem; transition: all .2s;
+      flex: 1; padding: 11px 8px; border: 2px solid var(--border); border-radius: 12px;
+      background: var(--bg); cursor: pointer; font-size: .9rem; font-weight: 500;
+      transition: all .2s; color: var(--muted);
     }
-    .user-btn.active { border-color: var(--primary); background: #e8f0ff; color: var(--primary); font-weight: 700; }
-    .pin-dots { display: flex; gap: 12px; justify-content: center; margin-bottom: 20px; }
-    .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--border); transition: background .15s; }
-    .pin-dot.filled { background: var(--primary); }
+    .user-btn.active {
+      border-color: var(--primary); background: rgba(99,102,241,.08);
+      color: var(--primary); font-weight: 700;
+      box-shadow: var(--glow-primary);
+    }
+    .pin-dots { display: flex; gap: 14px; justify-content: center; margin-bottom: 24px; }
+    .pin-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--border); transition: all .2s;
+    }
+    .pin-dot.filled {
+      background: var(--grad-primary); box-shadow: 0 2px 8px rgba(99,102,241,.4);
+      animation: dotPop .2s ease;
+    }
     .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .pin-key {
-      padding: 14px; border: none; border-radius: 10px; background: var(--bg);
-      font-size: 1.3rem; font-weight: 600; cursor: pointer; transition: background .15s;
+      padding: 16px; border: none; border-radius: 14px; background: var(--bg);
+      font-size: 1.4rem; font-weight: 600; cursor: pointer;
+      transition: all .15s; color: var(--text);
     }
-    .pin-key:hover { background: #dce8ff; }
-    .pin-key.del { font-size: 1rem; color: var(--danger); }
-    .pin-error { color: var(--danger); text-align: center; font-size: .88rem; margin-top: 10px; min-height: 20px; }
-    .pin-hint { color: var(--muted); text-align: center; font-size: .8rem; margin-top: 8px; }
+    .pin-key:hover  { background: rgba(99,102,241,.1); color: var(--primary); transform: scale(1.04); }
+    .pin-key:active { transform: scale(.96); }
+    .pin-key.del    { font-size: 1.1rem; color: var(--danger); }
+    .pin-error { color: var(--danger); text-align: center; font-size: .88rem; margin-top: 12px; min-height: 20px; font-weight: 500; }
+    .pin-error.shake { animation: shake .4s ease; }
+    .pin-hint  { color: var(--muted); text-align: center; font-size: .78rem; margin-top: 10px; }
 
-    /* ---- メイン ---- */
-    #app { display: none; max-width: 960px; margin: 0 auto; padding: 16px; }
+    /* ===== メインアプリ ===== */
+    #app { display: none; max-width: 980px; margin: 0 auto; padding: 16px 16px 80px; }
+
     header {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--card); border-radius: var(--radius); padding: 14px 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.07); margin-bottom: 16px;
+      box-shadow: var(--shadow-sm); margin-bottom: 16px;
     }
-    header h1 { font-size: 1.2rem; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
+    .header-logo { display: flex; align-items: center; gap: 10px; }
+    .header-icon {
+      width: 36px; height: 36px; border-radius: 10px; background: var(--grad-primary);
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
     .user-badge {
-      background: var(--primary); color: #fff; border-radius: 20px;
-      padding: 4px 14px; font-size: .85rem; font-weight: 600;
+      background: var(--grad-primary); color: #fff; border-radius: 99px;
+      padding: 5px 14px; font-size: .82rem; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(99,102,241,.35);
     }
     .logout-btn {
-      background: none; border: 1px solid var(--border); border-radius: 8px;
+      background: none; border: 1px solid var(--border); border-radius: 10px;
       padding: 5px 12px; cursor: pointer; font-size: .82rem; color: var(--muted);
+      transition: all .15s;
     }
-    .logout-btn:hover { background: var(--bg); }
+    .logout-btn:hover { background: var(--bg); border-color: var(--muted); }
 
+    /* 月ナビ */
     .month-nav {
       display: flex; align-items: center; justify-content: center; gap: 16px;
       margin-bottom: 16px;
     }
     .month-nav button {
-      background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-      padding: 6px 16px; cursor: pointer; font-size: 1rem;
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 7px 18px; cursor: pointer; font-size: .95rem; transition: all .15s;
+      color: var(--text); box-shadow: var(--shadow-sm);
     }
-    .month-nav span { font-size: 1.1rem; font-weight: 700; }
+    .month-nav button:hover { background: rgba(99,102,241,.08); border-color: var(--primary); color: var(--primary); }
+    .month-nav span { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; min-width: 100px; text-align: center; }
 
+    /* サマリーカード */
     .summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .summary-card {
+      border-radius: var(--radius); padding: 20px 18px; position: relative; overflow: hidden;
+      box-shadow: var(--shadow); color: #fff;
+    }
+    .summary-card.income-card  { background: var(--grad-income); }
+    .summary-card.expense-card { background: var(--grad-expense); }
+    .summary-card.balance-card { background: var(--grad-balance); }
+    .summary-card::before {
+      content: ''; position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,.12); pointer-events: none;
+    }
+    .summary-card::after {
+      content: ''; position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,.08); pointer-events: none;
+    }
+    .income-card::before  { width:100px;height:100px; right:-20px; top:-30px; }
+    .income-card::after   { width: 60px;height: 60px; right: 30px; bottom:-15px; }
+    .expense-card::before { width: 90px;height: 90px; right:-15px; top:-20px; }
+    .expense-card::after  { width: 50px;height: 50px; left: 20px; bottom:-10px; }
+    .balance-card::before { width:110px;height:110px; right:-25px; top:-35px; }
+    .balance-card::after  { width: 65px;height: 65px; left: 10px; bottom:-20px; }
+    .card-label { font-size: .78rem; opacity: .85; margin-bottom: 8px; font-weight: 500; position: relative; z-index:1; }
+    .card-emoji { font-size: 1.1rem; margin-right: 4px; }
+    .card-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; position: relative; z-index:1; }
+
+    /* 通常カード */
     .card {
       background: var(--card); border-radius: var(--radius);
-      padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      padding: 20px; box-shadow: var(--shadow-sm);
     }
-    .card-label { font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
-    .card-value { font-size: 1.5rem; font-weight: 700; }
-    .card-value.income { color: var(--success); }
-    .card-value.expense { color: var(--danger); }
-    .card-value.balance { color: var(--primary); }
-
     .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
     @media (max-width: 640px) {
       .summary-cards { grid-template-columns: 1fr; }
       .main-grid { grid-template-columns: 1fr; }
+      #app { padding-bottom: 90px; }
     }
 
-    .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+    .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -.01em; }
+
+    /* タブ（ボトムナビ風） */
+    .tabs {
+      display: flex; gap: 4px; margin-bottom: 16px;
+      background: var(--card); border-radius: var(--radius); padding: 6px;
+      box-shadow: var(--shadow-sm);
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 6px; border: none; border-radius: 10px;
+      background: none; cursor: pointer; font-size: .82rem; font-weight: 500;
+      color: var(--muted); transition: all .2s; position: relative; font-family: inherit;
+    }
+    .tab-btn::before {
+      content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 0; height: 2px; background: var(--grad-primary); border-radius: 99px;
+      transition: width .25s ease;
+    }
+    .tab-btn.active { background: rgba(99,102,241,.08); color: var(--primary); font-weight: 700; }
+    .tab-btn.active::before { width: 60%; }
 
     /* 入力フォーム */
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .form-full { grid-column: 1 / -1; }
-    .form-row { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: .8rem; color: var(--muted); }
+    .form-row { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: .78rem; color: var(--muted); font-weight: 500; }
     input, select {
-      padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 10px;
       font-size: .95rem; background: var(--bg); color: var(--text);
-      transition: border .15s;
+      transition: all .2s; font-family: inherit;
     }
-    input:focus, select:focus { outline: none; border-color: var(--primary); }
-    .type-toggle { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    input:focus, select:focus {
+      outline: none; border-color: var(--primary);
+      box-shadow: var(--glow-primary); background: var(--card);
+    }
+    .type-toggle {
+      display: flex; gap: 0; border: 1.5px solid var(--border); border-radius: 10px;
+      overflow: hidden; margin-bottom: 12px;
+    }
     .type-toggle button {
-      flex: 1; padding: 8px; border: none; background: var(--bg);
-      cursor: pointer; font-size: .9rem; transition: all .15s;
+      flex: 1; padding: 9px; border: none; background: var(--bg);
+      cursor: pointer; font-size: .9rem; font-weight: 500; transition: all .2s;
+      font-family: inherit; color: var(--muted);
     }
-    .type-toggle button.active.income { background: var(--success); color: #fff; }
-    .type-toggle button.active.expense { background: var(--danger); color: #fff; }
+    .type-toggle button.active.expense {
+      background: var(--grad-expense); color: #fff; font-weight: 700;
+      box-shadow: 0 2px 8px rgba(239,68,68,.3);
+    }
+    .type-toggle button.active.income {
+      background: var(--grad-income); color: #fff; font-weight: 700;
+      box-shadow: 0 2px 8px rgba(16,185,129,.3);
+    }
+
+    /* クイック入力ボタン */
+    .quick-amounts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .quick-btn {
+      padding: 5px 10px; border: 1.5px solid var(--border); border-radius: 99px;
+      background: var(--bg); cursor: pointer; font-size: .78rem; font-weight: 600;
+      color: var(--muted); transition: all .15s; font-family: inherit;
+    }
+    .quick-btn:hover {
+      border-color: var(--primary); color: var(--primary);
+      background: rgba(99,102,241,.08);
+    }
+    .quick-btn:active { transform: scale(.94); }
+
     .submit-btn {
-      width: 100%; padding: 10px; background: var(--primary); color: #fff;
-      border: none; border-radius: 8px; font-size: 1rem; font-weight: 600;
-      cursor: pointer; margin-top: 8px; transition: background .15s;
+      width: 100%; padding: 12px; background: var(--grad-primary); color: #fff;
+      border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 10px; transition: all .2s; font-family: inherit;
+      box-shadow: 0 4px 14px rgba(99,102,241,.4); letter-spacing: .01em;
     }
-    .submit-btn:hover { background: var(--primary-dark); }
+    .submit-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(99,102,241,.5); }
+    .submit-btn:active { transform: translateY(0); }
 
     /* 取引リスト */
-    .tx-list { max-height: 320px; overflow-y: auto; }
+    .tx-list { max-height: 340px; overflow-y: auto; }
     .tx-item {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 4px; border-bottom: 1px solid var(--border);
+      padding: 11px 6px; border-bottom: 1px solid var(--border);
+      transition: background .15s; border-radius: 8px; margin: 0 -6px;
     }
+    .tx-item:hover { background: var(--bg); }
     .tx-item:last-child { border-bottom: none; }
     .tx-left { display: flex; flex-direction: column; gap: 2px; }
-    .tx-category { font-size: .75rem; color: var(--muted); }
-    .tx-note { font-size: .9rem; }
-    .tx-meta { font-size: .72rem; color: var(--muted); }
+    .tx-cat-badge {
+      display: inline-flex; align-items: center; gap: 4px; font-size: .72rem;
+      background: rgba(99,102,241,.1); color: var(--primary); border-radius: 99px;
+      padding: 2px 8px; font-weight: 600; width: fit-content; margin-bottom: 1px;
+    }
+    .tx-note { font-size: .9rem; font-weight: 500; }
+    .tx-meta { font-size: .7rem; color: var(--muted); }
     .tx-right { display: flex; align-items: center; gap: 8px; }
     .tx-amount { font-weight: 700; font-size: 1rem; }
-    .tx-amount.income { color: var(--success); }
+    .tx-amount.income  { color: var(--success); }
     .tx-amount.expense { color: var(--danger); }
     .del-btn {
       background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: .85rem; padding: 2px 6px; border-radius: 4px;
+      font-size: .82rem; padding: 4px 7px; border-radius: 8px; transition: all .15s;
     }
-    .del-btn:hover { background: #fee; color: var(--danger); }
+    .del-btn:hover { background: rgba(239,68,68,.1); color: var(--danger); }
 
-    /* 予算セクション */
-    .budget-list { display: flex; flex-direction: column; gap: 10px; }
-    .budget-row { display: flex; flex-direction: column; gap: 4px; }
-    .budget-labels { display: flex; justify-content: space-between; font-size: .82rem; }
-    .budget-bar-bg { background: var(--bg); border-radius: 99px; height: 8px; overflow: hidden; }
-    .budget-bar { height: 100%; border-radius: 99px; background: var(--primary); transition: width .4s; }
-    .budget-bar.warn { background: var(--accent); }
-    .budget-bar.over { background: var(--danger); }
+    /* 予算バー */
+    .budget-list { display: flex; flex-direction: column; gap: 14px; }
+    .budget-row { display: flex; flex-direction: column; gap: 6px; }
+    .budget-labels { display: flex; justify-content: space-between; font-size: .83rem; align-items: center; }
+    .budget-cat { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .cat-icon { font-size: .95rem; }
+    .budget-amounts { font-size: .8rem; color: var(--muted); }
+    .budget-bar-bg {
+      background: var(--bg); border-radius: 99px; height: 9px; overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+    }
+    .budget-bar {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--violet) 100%);
+      transition: width .5s cubic-bezier(.34,1.56,.64,1);
+    }
+    .budget-bar.warn { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+    .budget-bar.over {
+      background: linear-gradient(90deg, var(--danger) 0%, #f97316 100%);
+      animation: barPulse 1.2s ease infinite;
+    }
+    .budget-pct { font-size: .75rem; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+    .budget-pct.ok   { background: rgba(99,102,241,.1);  color: var(--primary); }
+    .budget-pct.warn { background: rgba(245,158,11,.15); color: #d97706; }
+    .budget-pct.over { background: rgba(239,68,68,.1);  color: var(--danger); }
 
     /* チャート */
-    .chart-wrap { position: relative; height: 220px; }
+    .chart-wrap { position: relative; height: 230px; }
 
-    .empty { color: var(--muted); font-size: .9rem; text-align: center; padding: 24px 0; }
-
-    /* タブ */
-    .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
-    .tab-btn {
-      padding: 6px 16px; border: 1px solid var(--border); border-radius: 8px;
-      background: var(--card); cursor: pointer; font-size: .85rem; transition: all .15s;
+    .empty {
+      color: var(--muted); font-size: .9rem; text-align: center;
+      padding: 28px 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
     }
-    .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .empty-icon { font-size: 2rem; opacity: .4; }
 
-    /* 予算設定 */
-    .budget-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    /* 設定フォーム */
+    .budget-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .budget-settings .form-row { flex-direction: row; align-items: center; gap: 8px; }
-    .budget-settings label { min-width: 80px; color: var(--text); font-size: .88rem; }
-    .budget-settings input { width: 100px; }
+    .budget-settings label { min-width: 84px; color: var(--text); font-size: .85rem; font-weight: 500; }
+    .budget-settings input { width: 110px; }
+
+    /* モーダル（トランザクション追加用 - モバイル） */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(15,23,42,.5); backdrop-filter: blur(4px);
+      animation: fadeIn .2s ease;
+    }
+    .modal-overlay.open { display: flex; align-items: flex-end; justify-content: center; }
+    .modal-sheet {
+      background: var(--card); border-radius: 24px 24px 0 0; width: 100%; max-width: 500px;
+      padding: 16px 24px 32px; box-shadow: 0 -8px 40px rgba(0,0,0,.2);
+      animation: fadeUp .3s ease;
+    }
+    .modal-handle {
+      width: 40px; height: 4px; border-radius: 99px; background: var(--border);
+      margin: 0 auto 20px; cursor: grab;
+    }
+
+    /* ユーティリティ */
+    .text-success { color: var(--success); }
+    .text-danger  { color: var(--danger); }
+    .msg-area { margin-top: 8px; font-size: .85rem; font-weight: 500; min-height: 20px; }
   </style>
 </head>
 <body>
 
-<!-- PIN画面 -->
+<!-- ===== PIN画面 ===== -->
 <div id="pin-screen">
-  <h1>💰 家計管理</h1>
-  <p>ユーザーを選んでPINを入力してください</p>
+  <div class="pin-logo-wrap">💰</div>
+  <h1>家計管理</h1>
+  <p>ユーザーを選んでPINを入力</p>
   <div class="pin-box">
     <div class="user-select">
       <button class="user-btn active" id="btn-user1" onclick="selectUser('user1')">👤 ユーザー1</button>
@@ -203,14 +411,17 @@
       <button class="pin-key del" onclick="pinDel()">⌫</button>
     </div>
     <div class="pin-error" id="pin-error"></div>
-    <div class="pin-hint">初回: PIN「1234」でログイン。設定から変更できます</div>
+    <div class="pin-hint">初回PIN: <strong>1234</strong>（設定から変更できます）</div>
   </div>
 </div>
 
-<!-- メインアプリ -->
+<!-- ===== メインアプリ ===== -->
 <div id="app">
   <header>
-    <h1>💰 家計管理</h1>
+    <div class="header-logo">
+      <div class="header-icon">💰</div>
+      <h1>家計管理</h1>
+    </div>
     <div class="header-right">
       <span class="user-badge" id="current-user-label">ユーザー1</span>
       <button class="logout-btn" onclick="logout()">ログアウト</button>
@@ -224,35 +435,35 @@
   </div>
 
   <div class="summary-cards">
-    <div class="card">
-      <div class="card-label">収入</div>
-      <div class="card-value income" id="total-income">¥0</div>
+    <div class="summary-card income-card animate-fadeup" style="animation-delay:.05s">
+      <div class="card-label"><span class="card-emoji">📈</span>収入</div>
+      <div class="card-value" id="total-income">¥0</div>
     </div>
-    <div class="card">
-      <div class="card-label">支出</div>
-      <div class="card-value expense" id="total-expense">¥0</div>
+    <div class="summary-card expense-card animate-fadeup" style="animation-delay:.1s">
+      <div class="card-label"><span class="card-emoji">📉</span>支出</div>
+      <div class="card-value" id="total-expense">¥0</div>
     </div>
-    <div class="card">
-      <div class="card-label">残高</div>
-      <div class="card-value balance" id="total-balance">¥0</div>
+    <div class="summary-card balance-card animate-fadeup" style="animation-delay:.15s">
+      <div class="card-label"><span class="card-emoji">💎</span>残高</div>
+      <div class="card-value" id="total-balance">¥0</div>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('tab-main')">記録・一覧</button>
-    <button class="tab-btn" onclick="showTab('tab-budget')">予算管理</button>
-    <button class="tab-btn" onclick="showTab('tab-chart')">グラフ</button>
-    <button class="tab-btn" onclick="showTab('tab-settings')">設定</button>
+    <button class="tab-btn active" onclick="showTab('tab-main')">📝 記録</button>
+    <button class="tab-btn" onclick="showTab('tab-budget')">🎯 予算</button>
+    <button class="tab-btn" onclick="showTab('tab-chart')">📊 グラフ</button>
+    <button class="tab-btn" onclick="showTab('tab-settings')">⚙️ 設定</button>
   </div>
 
   <!-- 記録・一覧タブ -->
   <div id="tab-main">
     <div class="main-grid">
-      <div class="card">
+      <div class="card animate-fadeup">
         <div class="section-title">収支を記録</div>
-        <div class="type-toggle" style="margin-bottom:10px">
-          <button class="active expense" id="btn-expense" onclick="setType('expense')">支出</button>
-          <button class="income" id="btn-income" onclick="setType('income')">収入</button>
+        <div class="type-toggle">
+          <button class="active expense" id="btn-expense" onclick="setType('expense')">💸 支出</button>
+          <button class="income" id="btn-income" onclick="setType('income')">💰 収入</button>
         </div>
         <div class="form-grid">
           <div class="form-row">
@@ -263,6 +474,17 @@
             <label>金額 (円)</label>
             <input type="number" id="tx-amount" placeholder="例: 1500" min="0" />
           </div>
+          <div class="form-row form-full">
+            <label>クイック入力</label>
+            <div class="quick-amounts">
+              <button class="quick-btn" onclick="setAmount(100)">¥100</button>
+              <button class="quick-btn" onclick="setAmount(500)">¥500</button>
+              <button class="quick-btn" onclick="setAmount(1000)">¥1,000</button>
+              <button class="quick-btn" onclick="setAmount(3000)">¥3,000</button>
+              <button class="quick-btn" onclick="setAmount(5000)">¥5,000</button>
+              <button class="quick-btn" onclick="setAmount(10000)">¥10,000</button>
+            </div>
+          </div>
           <div class="form-row">
             <label>カテゴリ</label>
             <select id="tx-category"></select>
@@ -272,10 +494,10 @@
             <input type="text" id="tx-note" placeholder="メモ（任意）" />
           </div>
         </div>
-        <button class="submit-btn" onclick="addTransaction()">追加</button>
+        <button class="submit-btn" onclick="addTransaction()">追加する</button>
       </div>
 
-      <div class="card">
+      <div class="card animate-fadeup" style="animation-delay:.05s">
         <div class="section-title">取引一覧</div>
         <div class="tx-list" id="tx-list"></div>
       </div>
@@ -294,11 +516,11 @@
   <div id="tab-chart" style="display:none">
     <div class="main-grid">
       <div class="card">
-        <div class="section-title">支出内訳（円グラフ）</div>
+        <div class="section-title">支出内訳</div>
         <div class="chart-wrap"><canvas id="pie-chart"></canvas></div>
       </div>
       <div class="card">
-        <div class="section-title">月別推移（棒グラフ）</div>
+        <div class="section-title">月別推移</div>
         <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
       </div>
     </div>
@@ -324,28 +546,32 @@
           </div>
         </div>
         <button class="submit-btn" onclick="changePin()">PINを変更</button>
-        <div id="pin-change-msg" style="margin-top:8px;font-size:.85rem;"></div>
+        <div id="pin-change-msg" class="msg-area"></div>
       </div>
       <div class="card">
         <div class="section-title">月次予算の設定</div>
         <div class="budget-settings" id="budget-settings"></div>
-        <button class="submit-btn" onclick="saveBudgets()" style="margin-top:12px">保存</button>
+        <button class="submit-btn" onclick="saveBudgets()" style="margin-top:14px">保存</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-// ========== データ ==========
+// ===== カテゴリ定義 =====
+const CAT_ICONS = { '食費':'🍽️','交通費':'🚃','光熱費':'💡','住居費':'🏠','通信費':'📱','医療費':'🏥','娯楽費':'🎮','衣服費':'👕','教育費':'📚','その他':'📦','給与':'💼','副収入':'🌿','ボーナス':'🎁','その他収入':'💵' };
 const CATEGORIES_EXPENSE = ['食費','交通費','光熱費','住居費','通信費','医療費','娯楽費','衣服費','教育費','その他'];
 const CATEGORIES_INCOME  = ['給与','副収入','ボーナス','その他収入'];
 const DEFAULT_BUDGETS = { '食費':40000,'交通費':10000,'光熱費':15000,'住居費':80000,'通信費':8000,'医療費':5000,'娯楽費':10000,'衣服費':5000,'教育費':5000,'その他':5000 };
 const DEFAULT_PIN = '1234';
 
-function getData() { return JSON.parse(localStorage.getItem('kakeibo_data') || 'null') || { users: { user1: { name:'ユーザー1', pin: DEFAULT_PIN }, user2: { name:'ユーザー2', pin: DEFAULT_PIN } }, transactions: [], budgets: JSON.parse(JSON.stringify(DEFAULT_BUDGETS)) }; }
+function getData() {
+  return JSON.parse(localStorage.getItem('kakeibo_data') || 'null') ||
+    { users: { user1: { name:'ユーザー1', pin: DEFAULT_PIN }, user2: { name:'ユーザー2', pin: DEFAULT_PIN } }, transactions: [], budgets: JSON.parse(JSON.stringify(DEFAULT_BUDGETS)) };
+}
 function saveData(d) { localStorage.setItem('kakeibo_data', JSON.stringify(d)); }
 
-// ========== PIN認証 ==========
+// ===== PIN認証 =====
 let currentUser = 'user1';
 let pinBuffer = '';
 
@@ -353,21 +579,18 @@ function selectUser(u) {
   currentUser = u;
   document.getElementById('btn-user1').classList.toggle('active', u === 'user1');
   document.getElementById('btn-user2').classList.toggle('active', u === 'user2');
-  pinBuffer = '';
-  updateDots();
+  pinBuffer = ''; updateDots();
   document.getElementById('pin-error').textContent = '';
 }
 
 function pinInput(n) {
   if (pinBuffer.length >= 4) return;
-  pinBuffer += n;
-  updateDots();
+  pinBuffer += n; updateDots();
   if (pinBuffer.length === 4) verifyPin();
 }
 
 function pinDel() {
-  pinBuffer = pinBuffer.slice(0, -1);
-  updateDots();
+  pinBuffer = pinBuffer.slice(0, -1); updateDots();
   document.getElementById('pin-error').textContent = '';
 }
 
@@ -384,32 +607,32 @@ function verifyPin() {
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
     initApp();
   } else {
-    document.getElementById('pin-error').textContent = 'PINが違います';
-    pinBuffer = '';
-    updateDots();
+    const errEl = document.getElementById('pin-error');
+    errEl.textContent = 'PINが違います';
+    errEl.classList.remove('shake');
+    void errEl.offsetWidth;
+    errEl.classList.add('shake');
+    pinBuffer = ''; updateDots();
   }
 }
 
 function logout() {
-  pinBuffer = '';
-  updateDots();
+  pinBuffer = ''; updateDots();
   document.getElementById('pin-error').textContent = '';
   document.getElementById('pin-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   destroyCharts();
 }
 
-// ========== アプリ ==========
+// ===== アプリ =====
 let currentYear, currentMonth, currentType = 'expense';
 let pieChart = null, barChart = null;
 
 function initApp() {
   const now = new Date();
-  currentYear = now.getFullYear();
-  currentMonth = now.getMonth() + 1;
+  currentYear = now.getFullYear(); currentMonth = now.getMonth() + 1;
   document.getElementById('tx-date').value = now.toISOString().slice(0, 10);
-  updateCategorySelect();
-  renderAll();
+  updateCategorySelect(); renderAll();
 }
 
 function changeMonth(d) {
@@ -431,18 +654,20 @@ function setType(t) {
 function updateCategorySelect() {
   const sel = document.getElementById('tx-category');
   const cats = currentType === 'expense' ? CATEGORIES_EXPENSE : CATEGORIES_INCOME;
-  sel.innerHTML = cats.map(c => `<option>${c}</option>`).join('');
+  sel.innerHTML = cats.map(c => `<option value="${c}">${CAT_ICONS[c] || ''} ${c}</option>`).join('');
+}
+
+function setAmount(v) {
+  document.getElementById('tx-amount').value = v;
+  document.getElementById('tx-amount').focus();
 }
 
 function renderAll() {
   document.getElementById('month-label').textContent = `${currentYear}年${currentMonth}月`;
   const data = getData();
   const txs = monthlyTxs(data);
-  renderSummary(txs);
-  renderTxList(txs, data);
-  renderBudget(txs, data);
-  renderCharts(data);
-  renderBudgetSettings(data);
+  renderSummary(txs); renderTxList(txs, data);
+  renderBudget(txs, data); renderBudgetSettings(data);
 }
 
 function monthlyTxs(data) {
@@ -453,24 +678,25 @@ function monthlyTxs(data) {
 }
 
 function renderSummary(txs) {
-  const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-  const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  document.getElementById('total-income').textContent = '¥' + inc.toLocaleString();
+  const inc = txs.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const exp = txs.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+  document.getElementById('total-income').textContent  = '¥' + inc.toLocaleString();
   document.getElementById('total-expense').textContent = '¥' + exp.toLocaleString();
   const bal = inc - exp;
-  const el = document.getElementById('total-balance');
-  el.textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
-  el.className = 'card-value ' + (bal >= 0 ? 'balance' : 'expense');
+  document.getElementById('total-balance').textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
 }
 
 function renderTxList(txs, data) {
   const el = document.getElementById('tx-list');
-  if (!txs.length) { el.innerHTML = '<div class="empty">この月の記録はありません</div>'; return; }
+  if (!txs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>この月の記録はありません</div>';
+    return;
+  }
   const sorted = [...txs].sort((a,b) => new Date(b.date) - new Date(a.date));
   el.innerHTML = sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
-        <span class="tx-category">${t.category}</span>
+        <span class="tx-cat-badge">${CAT_ICONS[t.category] || ''}${t.category}</span>
         <span class="tx-note">${t.note || '（メモなし）'}</span>
         <span class="tx-meta">${t.date} · ${data.users[t.user]?.name || t.user}</span>
       </div>
@@ -486,13 +712,18 @@ function renderBudget(txs, data) {
   const expTxs = txs.filter(t => t.type === 'expense');
   el.innerHTML = CATEGORIES_EXPENSE.map(cat => {
     const budget = data.budgets[cat] || 0;
-    const spent = expTxs.filter(t => t.category === cat).reduce((s, t) => s + t.amount, 0);
-    const pct = budget > 0 ? Math.min(spent / budget * 100, 100) : 0;
-    const cls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+    const spent  = expTxs.filter(t => t.category === cat).reduce((s,t) => s + t.amount, 0);
+    const pct    = budget > 0 ? Math.min(spent / budget * 100, 100) : 0;
+    const rawPct = budget > 0 ? Math.round(spent / budget * 100) : 0;
+    const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
+    const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
     return `<div class="budget-row">
       <div class="budget-labels">
-        <span>${cat}</span>
-        <span>¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}</span>
+        <span class="budget-cat"><span class="cat-icon">${CAT_ICONS[cat]||''}</span>${cat}</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="budget-amounts">¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}</span>
+          <span class="budget-pct ${pctCls}">${rawPct}%</span>
+        </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
     </div>`;
@@ -503,21 +734,19 @@ function renderBudgetSettings(data) {
   const el = document.getElementById('budget-settings');
   el.innerHTML = CATEGORIES_EXPENSE.map(cat => `
     <div class="form-row">
-      <label>${cat}</label>
+      <label>${CAT_ICONS[cat]||''} ${cat}</label>
       <input type="number" id="budget-${cat}" value="${data.budgets[cat] || 0}" min="0" />
     </div>`).join('');
 }
 
-// ========== チャート ==========
+// ===== チャート =====
 function destroyCharts() {
   if (pieChart) { pieChart.destroy(); pieChart = null; }
   if (barChart) { barChart.destroy(); barChart = null; }
 }
 
 function renderCharts(data) {
-  destroyCharts();
-  renderPie(data);
-  renderBar(data);
+  destroyCharts(); renderPie(data); renderBar(data);
 }
 
 function renderPie(data) {
@@ -526,18 +755,17 @@ function renderPie(data) {
   txs.forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount; });
   const labels = Object.keys(map);
   const values = Object.values(map);
-  const colors = ['#4f8ef7','#f7c948','#3cba6e','#e05454','#a855f7','#f97316','#06b6d4','#ec4899','#84cc16','#6b7280'];
+  const colors = ['#6366f1','#8b5cf6','#ec4899','#f97316','#10b981','#f59e0b','#06b6d4','#ef4444','#84cc16','#64748b'];
   const ctx = document.getElementById('pie-chart').getContext('2d');
   pieChart = new Chart(ctx, {
     type: 'doughnut',
-    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } } }
+    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } } }
   });
 }
 
 function renderBar(data) {
-  const months = [];
-  const incomes = [], expenses = [];
+  const months = [], incomes = [], expenses = [];
   for (let i = 5; i >= 0; i--) {
     let y = currentYear, m = currentMonth - i;
     while (m < 1) { m += 12; y--; }
@@ -550,25 +778,25 @@ function renderBar(data) {
   barChart = new Chart(ctx, {
     type: 'bar',
     data: { labels: months, datasets: [
-      { label: '収入', data: incomes, backgroundColor: '#3cba6e' },
-      { label: '支出', data: expenses, backgroundColor: '#e05454' }
+      { label: '収入', data: incomes,  backgroundColor: 'rgba(16,185,129,.8)',  borderRadius: 6 },
+      { label: '支出', data: expenses, backgroundColor: 'rgba(239,68,68,.8)',   borderRadius: 6 }
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' } }, x: { grid: { display: false } } } }
   });
 }
 
-// ========== 操作 ==========
+// ===== 操作 =====
 function addTransaction() {
-  const date = document.getElementById('tx-date').value;
-  const amount = parseInt(document.getElementById('tx-amount').value);
+  const date     = document.getElementById('tx-date').value;
+  const amount   = parseInt(document.getElementById('tx-amount').value);
   const category = document.getElementById('tx-category').value;
-  const note = document.getElementById('tx-note').value.trim();
+  const note     = document.getElementById('tx-note').value.trim();
   if (!date || !amount || amount <= 0) { alert('日付と正の金額を入力してください'); return; }
   const data = getData();
   data.transactions.push({ id: Date.now().toString(), date, amount, category, note, type: currentType, user: currentUser });
   saveData(data);
   document.getElementById('tx-amount').value = '';
-  document.getElementById('tx-note').value = '';
+  document.getElementById('tx-note').value   = '';
   renderAll();
 }
 
@@ -576,8 +804,7 @@ function deleteTx(id) {
   if (!confirm('この取引を削除しますか？')) return;
   const data = getData();
   data.transactions = data.transactions.filter(t => t.id !== id);
-  saveData(data);
-  renderAll();
+  saveData(data); renderAll();
 }
 
 function saveBudgets() {
@@ -586,8 +813,7 @@ function saveBudgets() {
     const v = parseInt(document.getElementById('budget-' + cat).value) || 0;
     data.budgets[cat] = v;
   });
-  saveData(data);
-  renderAll();
+  saveData(data); renderAll();
   alert('予算を保存しました');
 }
 
@@ -597,23 +823,19 @@ function changePin() {
   const cnf = document.getElementById('confirm-pin').value;
   const msg = document.getElementById('pin-change-msg');
   const data = getData();
-  if (data.users[currentUser].pin !== old) { msg.style.color='var(--danger)'; msg.textContent='現在のPINが違います'; return; }
-  if (!/^\d{4}$/.test(nw)) { msg.style.color='var(--danger)'; msg.textContent='PINは4桁の数字です'; return; }
-  if (nw !== cnf) { msg.style.color='var(--danger)'; msg.textContent='新しいPINが一致しません'; return; }
+  if (data.users[currentUser].pin !== old) { msg.className='msg-area text-danger'; msg.textContent='現在のPINが違います'; return; }
+  if (!/^\d{4}$/.test(nw))                 { msg.className='msg-area text-danger'; msg.textContent='PINは4桁の数字です'; return; }
+  if (nw !== cnf)                          { msg.className='msg-area text-danger'; msg.textContent='新しいPINが一致しません'; return; }
   data.users[currentUser].pin = nw;
   saveData(data);
-  msg.style.color = 'var(--success)';
-  msg.textContent = 'PINを変更しました';
+  msg.className = 'msg-area text-success'; msg.textContent = 'PINを変更しました';
   ['old-pin','new-pin','confirm-pin'].forEach(id => document.getElementById(id).value = '');
 }
 
 function showTab(id) {
-  ['tab-main','tab-budget','tab-chart','tab-settings'].forEach(t => {
-    document.getElementById(t).style.display = t === id ? '' : 'none';
-  });
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    b.classList.toggle('active', ['tab-main','tab-budget','tab-chart','tab-settings'][i] === id);
-  });
+  const TABS = ['tab-main','tab-budget','tab-chart','tab-settings'];
+  TABS.forEach(t => document.getElementById(t).style.display = t === id ? '' : 'none');
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TABS[i] === id));
   if (id === 'tab-chart') renderCharts(getData());
 }
 </script>
