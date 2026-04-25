@@ -241,6 +241,12 @@
       .card-value { font-size: 1.4rem; }
     }
 
+    @media (max-width: 380px) {
+      /* タブを絵文字のみに */
+      .tab-btn { font-size: 1.1rem; padding: 9px 2px; }
+      .tab-btn .tab-text { display: none; }
+    }
+
     .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -.01em; }
 
     /* タブ（ボトムナビ風） */
@@ -478,6 +484,20 @@
     .week-bar { height: 100%; border-radius: 99px; background: rgba(255,255,255,.9); transition: width .5s cubic-bezier(.34,1.56,.64,1); }
     .week-bar.warn { background: #fbbf24; }
     .week-bar.over { background: #f87171; animation: barPulse 1.2s ease infinite; }
+    .week-nav-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; position: relative; z-index:1; }
+    .week-nav-btn {
+      background: rgba(255,255,255,.15); border: none; color: #fff;
+      border-radius: 8px; width: 28px; height: 28px; cursor: pointer;
+      font-size: .8rem; transition: background .15s; font-family: inherit;
+    }
+    .week-nav-btn:hover { background: rgba(255,255,255,.28); }
+    .week-today-btn {
+      margin-top: 10px; padding: 5px 14px; border: 1px solid rgba(255,255,255,.4);
+      background: rgba(255,255,255,.1); color: #fff; border-radius: 99px;
+      font-size: .76rem; cursor: pointer; font-family: inherit;
+      position: relative; z-index:1; transition: background .15s; font-weight: 600;
+    }
+    .week-today-btn:hover { background: rgba(255,255,255,.22); }
 
     /* ===== カレンダー ===== */
     .cal-header {
@@ -605,11 +625,11 @@
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('tab-main')">📝 記録</button>
-    <button class="tab-btn" onclick="showTab('tab-budget')">🎯 予算</button>
-    <button class="tab-btn" onclick="showTab('tab-chart')">📊 グラフ</button>
-    <button class="tab-btn" onclick="showTab('tab-calendar')">📅 カレンダー</button>
-    <button class="tab-btn" onclick="showTab('tab-settings')">⚙️ 設定</button>
+    <button class="tab-btn active" onclick="showTab('tab-main')" title="記録">📝<span class="tab-text"> 記録</span></button>
+    <button class="tab-btn" onclick="showTab('tab-budget')" title="予算">🎯<span class="tab-text"> 予算</span></button>
+    <button class="tab-btn" onclick="showTab('tab-chart')" title="グラフ">📊<span class="tab-text"> グラフ</span></button>
+    <button class="tab-btn" onclick="showTab('tab-calendar')" title="カレンダー">📅<span class="tab-text"> カレンダー</span></button>
+    <button class="tab-btn" onclick="showTab('tab-settings')" title="設定">⚙️<span class="tab-text"> 設定</span></button>
   </div>
 
   <!-- 記録・一覧タブ -->
@@ -685,11 +705,15 @@
   <!-- カレンダータブ -->
   <div id="tab-calendar" style="display:none">
     <div class="weekly-budget-card animate-fadeup">
-      <div class="week-label">📅 今週の予算</div>
-      <div class="week-dates" id="week-dates">-</div>
+      <div class="week-label">📅 週次予算</div>
+      <div class="week-nav-row">
+        <button class="week-nav-btn" onclick="changeWeek(-1)" title="前の週">◀</button>
+        <div class="week-dates" id="week-dates">-</div>
+        <button class="week-nav-btn" onclick="changeWeek(1)" title="次の週">▶</button>
+      </div>
       <div class="week-stats">
         <div class="week-stat">
-          <span class="week-stat-label">今週の支出</span>
+          <span class="week-stat-label">支出</span>
           <span class="week-stat-value" id="week-expense">¥0</span>
         </div>
         <div class="week-stat">
@@ -702,6 +726,7 @@
         </div>
       </div>
       <div class="week-bar-bg"><div class="week-bar" id="week-bar" style="width:0%"></div></div>
+      <div style="text-align:center"><button class="week-today-btn" id="week-today-btn" onclick="resetWeek()" style="display:none">今週へ戻る</button></div>
     </div>
     <div class="card animate-fadeup" style="animation-delay:.05s">
       <div class="section-title">月間カレンダー</div>
@@ -844,6 +869,12 @@ function escHtml(s) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+async function sha256(str) {
+  const buf  = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 function getData() {
   let d = null;
   try { d = JSON.parse(localStorage.getItem('kakeibo_data')); } catch(e) {}
@@ -898,9 +929,16 @@ function updateDots() {
     document.getElementById('d' + i).classList.toggle('filled', i < pinBuffer.length);
 }
 
-function verifyPin() {
-  const data = getData();
-  if (data.users[currentUser].pin === pinBuffer) {
+async function verifyPin() {
+  const data     = getData();
+  const stored   = data.users[currentUser].pin;
+  const isLegacy = /^\d{4}$/.test(stored);
+  const match    = isLegacy ? (stored === pinBuffer) : (stored === await sha256(pinBuffer));
+  if (match) {
+    if (isLegacy) {
+      data.users[currentUser].pin = await sha256(pinBuffer);
+      saveData(data);
+    }
     document.getElementById('pin-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
@@ -933,6 +971,7 @@ let pieChart = null, barChart = null;
 function initApp() {
   const now = new Date();
   currentYear = now.getFullYear(); currentMonth = now.getMonth() + 1;
+  initWeek();
   document.getElementById('tx-date').value = now.toISOString().slice(0, 10);
   updateCategorySelect(); renderAll();
 }
@@ -1233,10 +1272,37 @@ function fmtK(n) {
   return String(n);
 }
 
-function getWeekRange() {
+let currentWeekDate = null; // 表示中の週の月曜日
+
+function todayMonday() {
   const today = new Date();
-  const diff = (today.getDay() + 6) % 7; // days since Monday
-  const monday = new Date(today); monday.setDate(today.getDate() - diff); monday.setHours(0,0,0,0);
+  const diff  = (today.getDay() + 6) % 7;
+  const m     = new Date(today);
+  m.setDate(today.getDate() - diff); m.setHours(0,0,0,0);
+  return m;
+}
+
+function initWeek() { currentWeekDate = todayMonday(); }
+
+function changeWeek(d) {
+  if (!currentWeekDate) initWeek();
+  currentWeekDate = new Date(currentWeekDate);
+  currentWeekDate.setDate(currentWeekDate.getDate() + d * 7);
+  renderWeeklyBudget(getData());
+}
+
+function resetWeek() {
+  initWeek();
+  renderWeeklyBudget(getData());
+}
+
+function isCurrentWeek() {
+  return currentWeekDate && currentWeekDate.getTime() === todayMonday().getTime();
+}
+
+function getWeekRange() {
+  if (!currentWeekDate) initWeek();
+  const monday = new Date(currentWeekDate);
   const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
   return { monday, sunday };
 }
@@ -1247,6 +1313,7 @@ function renderCalendarTab(data) {
 }
 
 function renderWeeklyBudget(data) {
+  if (!currentWeekDate) initWeek();
   const { monday, sunday } = getWeekRange();
   const weekExp = data.transactions
     .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= monday && d <= sunday; })
@@ -1257,7 +1324,7 @@ function renderWeeklyBudget(data) {
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
   const fmt    = d => `${d.getMonth() + 1}/${d.getDate()}`;
 
-  document.getElementById('week-dates').textContent   = `${fmt(monday)}（月）〜 ${fmt(sunday)}（日）`;
+  document.getElementById('week-dates').textContent   = `${fmt(monday)}（月）〜 ${fmt(sunday)}（日）${isCurrentWeek() ? '・今週' : ''}`;
   document.getElementById('week-expense').textContent = '¥' + weekExp.toLocaleString();
   document.getElementById('week-budget-val').textContent = budget > 0 ? '¥' + budget.toLocaleString() : '未設定';
   const remEl = document.getElementById('week-remain');
@@ -1270,6 +1337,8 @@ function renderWeeklyBudget(data) {
   const bar = document.getElementById('week-bar');
   bar.style.width = pct + '%';
   bar.className = 'week-bar' + (cls ? ' ' + cls : '');
+  const todayBtn = document.getElementById('week-today-btn');
+  if (todayBtn) todayBtn.style.display = isCurrentWeek() ? 'none' : '';
 }
 
 function renderCalendar(data) {
@@ -1686,16 +1755,19 @@ async function manualSync() {
 
 setupSyncFromHash();
 
-function updateUserPin(uid) {
+async function updateUserPin(uid) {
   const oldPin = document.getElementById('upin-old-' + uid).value;
   const newPin = document.getElementById('upin-new-' + uid).value;
   const cfmPin = document.getElementById('upin-cfm-' + uid).value;
   const msg    = document.getElementById('pin-msg-' + uid);
   const data   = getData();
-  if (data.users[uid].pin !== oldPin) { msg.className = 'msg-area text-danger'; msg.textContent = '現在のPINが違います'; return; }
-  if (!/^\d{4}$/.test(newPin))        { msg.className = 'msg-area text-danger'; msg.textContent = 'PINは4桁の数字で入力してください'; return; }
-  if (newPin !== cfmPin)              { msg.className = 'msg-area text-danger'; msg.textContent = '新しいPINが一致しません'; return; }
-  data.users[uid].pin = newPin;
+  const stored = data.users[uid].pin;
+  const isLegacy = /^\d{4}$/.test(stored);
+  const oldMatch = isLegacy ? (stored === oldPin) : (stored === await sha256(oldPin));
+  if (!oldMatch)               { msg.className = 'msg-area text-danger'; msg.textContent = '現在のPINが違います'; return; }
+  if (!/^\d{4}$/.test(newPin)) { msg.className = 'msg-area text-danger'; msg.textContent = 'PINは4桁の数字で入力してください'; return; }
+  if (newPin !== cfmPin)       { msg.className = 'msg-area text-danger'; msg.textContent = '新しいPINが一致しません'; return; }
+  data.users[uid].pin = await sha256(newPin);
   saveData(data);
   msg.className = 'msg-area text-success'; msg.textContent = 'PINを変更しました';
   document.getElementById('upin-old-' + uid).value = '';
