@@ -1,0 +1,26 @@
+{
+  "name": "家計管理",
+  "short_name": "家計管理",
+  "description": "夫婦で使える家計管理アプリ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#4f46e5",
+  "theme_color": "#6366f1",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icon-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
