@@ -235,11 +235,6 @@
       .form-grid { grid-template-columns: 1fr; }
       .form-full { grid-column: 1; }
 
-      /* 予算設定も1列に */
-      .budget-settings { grid-template-columns: 1fr; }
-      .budget-settings .form-row { flex-direction: column; align-items: flex-start; }
-      .budget-settings input { width: 100%; }
-
       /* ユーザー設定モーダルのPIN入力行を折り返し */
       .user-setting-row { flex-wrap: wrap; }
       .user-setting-row .form-row { flex: 1 1 120px; min-width: 0; }
@@ -410,9 +405,8 @@
 
     /* 設定フォーム */
     .budget-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .budget-settings .form-row { flex-direction: row; align-items: center; gap: 8px; }
-    .budget-settings label { min-width: 84px; color: var(--text); font-size: .85rem; font-weight: 500; }
-    .budget-settings input { width: 110px; }
+    .budget-settings label { color: var(--text); font-size: .85rem; font-weight: 500; }
+    .budget-settings input { width: 100%; }
 
     /* モーダル */
     .modal-overlay {
