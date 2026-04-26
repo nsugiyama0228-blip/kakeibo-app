@@ -1792,7 +1792,7 @@ async function pushToGist() {
   if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
   setSyncStatus('syncing');
   const data = getData();
-  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget, weekStart: data.weekStart };
+  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weeklyBudget: data.weeklyBudget, weekStart: data.weekStart, weekBudgetOverrides: data.weekBudgetOverrides };
   try {
     const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       method: 'PATCH',
@@ -1838,6 +1838,7 @@ function mergeRemoteData(remote) {
   if (remote.catIcons && typeof remote.catIcons === 'object') local.catIcons = remote.catIcons;
   if (typeof remote.weeklyBudget === 'number') local.weeklyBudget = remote.weeklyBudget;
   if (typeof remote.weekStart === 'number' && remote.weekStart >= 0 && remote.weekStart <= 6) local.weekStart = remote.weekStart;
+  if (remote.weekBudgetOverrides && typeof remote.weekBudgetOverrides === 'object') local.weekBudgetOverrides = remote.weekBudgetOverrides;
   saveData(local);
 }
 
