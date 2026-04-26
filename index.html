@@ -1373,9 +1373,18 @@ function renderWeeklyBudget(data) {
     .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= monday && d <= sunday; })
     .reduce((s, t) => s + t.amount, 0);
   const weekStart = data.weekStart ?? 1;
-  const nWeeks = getMonthWeeks(currentYear, currentMonth, weekStart).length;
+  const weeks = getMonthWeeks(currentYear, currentMonth, weekStart);
+  const n = weeks.length;
   const totalMonthBudget = (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0);
-  const budget = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / nWeeks) : 0;
+  const perWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
+  // 表示中の週が currentMonth の何週目かを特定して端数処理を揃える
+  const refDate = monday.getFullYear() === currentYear && monday.getMonth() + 1 === currentMonth
+    ? monday.getDate()
+    : (sunday.getFullYear() === currentYear && sunday.getMonth() + 1 === currentMonth ? sunday.getDate() : -1);
+  const weekIdx = refDate >= 0 ? weeks.findIndex(w => refDate >= w.startDay && refDate <= w.endDay) : -1;
+  const budget = totalMonthBudget > 0
+    ? (weekIdx >= 0 ? (weekIdx < n - 1 ? perWeek : totalMonthBudget - perWeek * (n - 1)) : perWeek)
+    : 0;
   const remain = budget - weekExp;
   const pct    = budget > 0 ? Math.min(weekExp / budget * 100, 100) : 0;
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
