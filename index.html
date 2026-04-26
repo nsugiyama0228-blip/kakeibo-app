@@ -793,33 +793,20 @@
         <span class="setting-arrow">›</span>
       </div>
     </div>
-    <div class="card" style="margin-bottom:16px">
-      <div class="section-title">📅 週次予算の設定</div>
-      <div style="display:flex;gap:10px;align-items:flex-end;max-width:360px;margin-bottom:10px">
-        <div class="form-row" style="flex:1">
-          <label>週の開始曜日</label>
-          <select id="week-start-select">
-            <option value="0">日曜始まり</option>
-            <option value="1">月曜始まり</option>
-            <option value="2">火曜始まり</option>
-            <option value="3">水曜始まり</option>
-            <option value="4">木曜始まり</option>
-            <option value="5">金曜始まり</option>
-            <option value="6">土曜始まり</option>
-          </select>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-end;max-width:360px">
-        <div class="form-row" style="flex:1">
-          <label>1週間の支出予算 (円)</label>
-          <input type="number" id="weekly-budget-input" placeholder="例: 30000" min="0" />
-        </div>
-        <button class="save-btn" onclick="saveWeeklyBudget()">保存</button>
-      </div>
-      <div id="weekly-budget-msg" class="msg-area"></div>
-    </div>
     <div class="card">
       <div class="section-title">月次予算の設定</div>
+      <div class="form-row" style="max-width:220px;margin-bottom:12px">
+        <label>週の開始曜日</label>
+        <select id="week-start-select">
+          <option value="0">日曜始まり</option>
+          <option value="1">月曜始まり</option>
+          <option value="2">火曜始まり</option>
+          <option value="3">水曜始まり</option>
+          <option value="4">木曜始まり</option>
+          <option value="5">金曜始まり</option>
+          <option value="6">土曜始まり</option>
+        </select>
+      </div>
       <div class="budget-settings" id="budget-settings"></div>
       <button class="submit-btn" onclick="saveBudgets()" style="margin-top:14px">保存</button>
       <div id="budget-save-msg" class="msg-area"></div>
@@ -1058,6 +1045,7 @@ function renderAll() {
   renderSummary(txs); renderTxList(txs, data);
   renderBudget(txs, data); renderBudgetSettings(data);
   renderWeeklyBreakdown();
+  renderWeeklyBudget(data);
 }
 
 function monthlyTxs(data) {
@@ -1220,7 +1208,10 @@ function saveBudgets() {
     const el = document.getElementById('budget-idx-' + i);
     if (el) data.budgets[cat] = parseInt(el.value) || 0;
   });
-  saveData(data); renderAll();
+  const wsEl = document.getElementById('week-start-select');
+  const ws = wsEl ? parseInt(wsEl.value) : 1;
+  if (ws >= 0 && ws <= 6) data.weekStart = ws;
+  saveData(data); initWeek(); renderAll();
   const bmsg = document.getElementById('budget-save-msg');
   if (bmsg) { bmsg.className = 'msg-area text-success'; bmsg.textContent = '予算を保存しました'; }
   schedulePush();
@@ -1381,7 +1372,11 @@ function renderWeeklyBudget(data) {
   const weekExp = data.transactions
     .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= monday && d <= sunday; })
     .reduce((s, t) => s + t.amount, 0);
-  const budget = data.weeklyBudget || 0;
+  const budgetYear = monday.getFullYear(), budgetMonth = monday.getMonth() + 1;
+  const weekStart = data.weekStart ?? 1;
+  const nWeeks = getMonthWeeks(budgetYear, budgetMonth, weekStart).length;
+  const totalMonthBudget = (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0);
+  const budget = totalMonthBudget > 0 ? Math.round(totalMonthBudget / nWeeks) : 0;
   const remain = budget - weekExp;
   const pct    = budget > 0 ? Math.min(weekExp / budget * 100, 100) : 0;
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
@@ -1490,19 +1485,7 @@ function deleteTxFromDay(id, dateStr) {
   else showDayDetail(dateStr);
 }
 
-function saveWeeklyBudget() {
-  const v    = parseInt(document.getElementById('weekly-budget-input').value) || 0;
-  const wsEl = document.getElementById('week-start-select');
-  const ws   = wsEl ? parseInt(wsEl.value) : 1;
-  const msg  = document.getElementById('weekly-budget-msg');
-  const data = getData();
-  data.weeklyBudget = v;
-  if (ws >= 0 && ws <= 6) data.weekStart = ws;
-  saveData(data);
-  initWeek();
-  msg.className = 'msg-area text-success'; msg.textContent = '保存しました';
-  schedulePush();
-}
+
 
 // ===== 月内週次内訳 =====
 function getMonthWeeks(year, month, weekStart) {
@@ -1528,30 +1511,36 @@ function renderWeeklyBreakdown() {
 
   const cats    = data.categories.expense;
   const prevVal = sel.value;
-  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c]||CAT_ICONS[c]||''} ${escHtml(c)}</option>`).join('');
-  if (cats.includes(prevVal)) sel.value = prevVal;
+  const TOTAL_KEY = '__total__';
+  sel.innerHTML = `<option value="${TOTAL_KEY}">📊 合計（週次予算）</option>` +
+    cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c]||CAT_ICONS[c]||''} ${escHtml(c)}</option>`).join('');
+  if (prevVal === TOTAL_KEY || cats.includes(prevVal)) sel.value = prevVal;
   else if (cats.includes('食費')) sel.value = '食費';
-  else sel.value = cats[0] || '';
+  else sel.value = TOTAL_KEY;
 
   const cat = sel.value;
   if (!cat) { el.innerHTML = ''; return; }
 
-  const monthBudget = data.budgets[cat] || 0;
+  const isTotal = cat === TOTAL_KEY;
+  const monthBudget = isTotal ? 0 : (data.budgets[cat] || 0);
   const weeks = getMonthWeeks(currentYear, currentMonth, data.weekStart ?? 1);
   const n = weeks.length;
+  const totalMonthBudget = isTotal ? (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0) : 0;
   const perWeek = monthBudget > 0 ? Math.floor(monthBudget / n) : 0;
   const DAY = ['日','月','火','水','木','金','土'];
   const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
 
   el.innerHTML = weeks.map((w, i) => {
-    const wBudget = monthBudget > 0
-      ? (i < n - 1 ? perWeek : monthBudget - perWeek * (n - 1))
-      : 0;
+    const totalPerWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
+    const wBudget = isTotal
+      ? (totalMonthBudget > 0 ? (i < n - 1 ? totalPerWeek : totalMonthBudget - totalPerWeek * (n - 1)) : 0)
+      : (monthBudget > 0 ? (i < n - 1 ? perWeek : monthBudget - perWeek * (n - 1)) : 0);
     const ds = new Date(currentYear, currentMonth - 1, w.startDay);
     const de = new Date(currentYear, currentMonth - 1, w.endDay);
     const spent = data.transactions
       .filter(t => {
-        if (t.type !== 'expense' || t.category !== cat) return false;
+        if (t.type !== 'expense') return false;
+        if (!isTotal && t.category !== cat) return false;
         const d = new Date(t.date + 'T00:00:00');
         return d >= ds && d <= de;
       })
@@ -1560,13 +1549,16 @@ function renderWeeklyBreakdown() {
     const rawPct = wBudget > 0 ? Math.round(spent / wBudget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    const budgetLabel = wBudget > 0
+      ? `¥${spent.toLocaleString()} / ¥${wBudget.toLocaleString()}`
+      : `¥${spent.toLocaleString()}（予算未設定）`;
     return `<div class="budget-row">
       <div class="budget-labels">
         <span class="budget-cat" style="font-size:.8rem">
           第${i+1}週 <span style="color:var(--muted);font-weight:400;font-size:.72rem">${fmt(ds)}（${DAY[ds.getDay()]}）〜${fmt(de)}（${DAY[de.getDay()]}）</span>
         </span>
         <span style="display:flex;align-items:center;gap:6px">
-          <span class="budget-amounts">${wBudget > 0 ? `¥${spent.toLocaleString()} / ¥${wBudget.toLocaleString()}` : `¥${spent.toLocaleString()}（予算未設定）`}</span>
+          <span class="budget-amounts">${budgetLabel}</span>
           ${wBudget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
         </span>
       </div>
