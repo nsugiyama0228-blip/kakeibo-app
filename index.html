@@ -1107,6 +1107,11 @@ function renderBudget(txs, data) {
     const rawPct = budget > 0 ? Math.round(spent / budget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
+    const remain = budget - spent;
+    const remainText = budget > 0
+      ? ((remain >= 0 ? '残 ¥' : '超過 ¥') + Math.abs(remain).toLocaleString())
+      : '';
+    const remainColor = remain < 0 ? 'color:#f87171' : 'color:var(--muted)';
     const amountText = budget > 0
       ? `¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}`
       : `¥${spent.toLocaleString()}（予算未設定）`;
@@ -1119,6 +1124,7 @@ function renderBudget(txs, data) {
         </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
+      ${budget > 0 ? `<div style="font-size:.72rem;${remainColor};text-align:right">${remainText}</div>` : ''}
     </div>`;
   }).join('');
 }
