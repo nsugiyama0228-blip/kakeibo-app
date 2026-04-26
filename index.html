@@ -705,7 +705,6 @@
           <div class="section-title" style="margin-bottom:0">📅 月内 週次内訳</div>
           <select id="weekly-cat-select" onchange="renderWeeklyBreakdown()" style="font-size:.82rem;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit"></select>
         </div>
-        <div id="weekly-budget-edit-row" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap"></div>
         <div id="weekly-breakdown-list"></div>
       </div>
     </div>
@@ -929,6 +928,7 @@ function getData() {
     if (!Array.isArray(d.categories.income))  d.categories.income  = [...CATEGORIES_INCOME];
   }
   if (!d.catIcons || typeof d.catIcons !== 'object') d.catIcons = Object.assign({}, CAT_ICONS);
+  if (!d.weekBudgetOverrides || typeof d.weekBudgetOverrides !== 'object') d.weekBudgetOverrides = {};
   return d;
 }
 function saveData(d) { localStorage.setItem('kakeibo_data', JSON.stringify(d)); }
@@ -1219,18 +1219,6 @@ function saveBudgets() {
   schedulePush();
 }
 
-function saveInlineBudget() {
-  const sel = document.getElementById('weekly-cat-select');
-  const inp = document.getElementById('inline-budget-input');
-  const msg = document.getElementById('inline-budget-msg');
-  if (!sel || !inp) return;
-  const cat = sel.value;
-  const v = parseInt(inp.value) || 0;
-  const data = getData();
-  data.budgets[cat] = v;
-  saveData(data); renderAll(); schedulePush();
-  if (msg) { msg.textContent = '保存しました'; setTimeout(() => { if (msg) msg.textContent = ''; }, 2000); }
-}
 
 function showTab(id) {
   const TABS = ['tab-main','tab-budget','tab-chart','tab-calendar','tab-settings'];
@@ -1384,29 +1372,39 @@ function renderCalendarHeader(data) {
 function renderWeeklyBudget(data) {
   if (!currentWeekDate) initWeek();
   const { monday, sunday } = getWeekRange();
-  const weekExp = data.transactions
-    .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= monday && d <= sunday; })
-    .reduce((s, t) => s + t.amount, 0);
   const weekStart = data.weekStart ?? 1;
+
+  // 週を currentMonth 内にクリップ
+  const firstOfMonth = new Date(currentYear, currentMonth - 1, 1);
+  firstOfMonth.setHours(0, 0, 0, 0);
+  const lastOfMonth = new Date(currentYear, currentMonth, 0);
+  lastOfMonth.setHours(23, 59, 59, 999);
+  const clippedStart = monday < firstOfMonth ? firstOfMonth : monday;
+  const clippedEnd   = sunday > lastOfMonth  ? lastOfMonth  : sunday;
+
+  const weekExp = data.transactions
+    .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= clippedStart && d <= clippedEnd; })
+    .reduce((s, t) => s + t.amount, 0);
   const weeks = getMonthWeeks(currentYear, currentMonth, weekStart);
   const n = weeks.length;
   const totalMonthBudget = (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0);
   const perWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
-  // 表示中の週が currentMonth の何週目かを特定して端数処理を揃える
-  const refDate = monday.getFullYear() === currentYear && monday.getMonth() + 1 === currentMonth
-    ? monday.getDate()
-    : (sunday.getFullYear() === currentYear && sunday.getMonth() + 1 === currentMonth ? sunday.getDate() : -1);
-  const weekIdx = refDate >= 0 ? weeks.findIndex(w => refDate >= w.startDay && refDate <= w.endDay) : -1;
-  const budget = totalMonthBudget > 0
+  // クリップ後の開始日で週インデックスを特定
+  const refDay  = clippedStart.getDate();
+  const weekIdx = weeks.findIndex(w => refDay >= w.startDay && refDay <= w.endDay);
+  const autoCalc = totalMonthBudget > 0
     ? (weekIdx >= 0 ? (weekIdx < n - 1 ? perWeek : totalMonthBudget - perWeek * (n - 1)) : perWeek)
     : 0;
+  const weekKey = weekIdx >= 0 ? `${currentYear}-${currentMonth}-${weekIdx}` : null;
+  const override = weekKey ? data.weekBudgetOverrides?.['__total__']?.[weekKey] : undefined;
+  const budget = override !== undefined ? override : autoCalc;
   const remain = budget - weekExp;
   const pct    = budget > 0 ? Math.min(weekExp / budget * 100, 100) : 0;
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
   const fmt    = d => `${d.getMonth() + 1}/${d.getDate()}`;
 
   const DAY = ['日','月','火','水','木','金','土'];
-  document.getElementById('week-dates').textContent   = `${fmt(monday)}（${DAY[monday.getDay()]}）〜 ${fmt(sunday)}（${DAY[sunday.getDay()]}）${isCurrentWeek() ? '・今週' : ''}`;
+  document.getElementById('week-dates').textContent   = `${fmt(clippedStart)}（${DAY[clippedStart.getDay()]}）〜 ${fmt(clippedEnd)}（${DAY[clippedEnd.getDay()]}）${isCurrentWeek() ? '・今週' : ''}`;
   document.getElementById('week-expense').textContent = '¥' + weekExp.toLocaleString();
   document.getElementById('week-budget-val').textContent = budget > 0 ? '¥' + budget.toLocaleString() : '未設定';
   const remEl = document.getElementById('week-remain');
@@ -1546,22 +1544,6 @@ function renderWeeklyBreakdown() {
 
   const isTotal = cat === TOTAL_KEY;
   const monthBudget = isTotal ? 0 : (data.budgets[cat] || 0);
-
-  // 月次予算の編集行を描画
-  const editRow = document.getElementById('weekly-budget-edit-row');
-  if (editRow) {
-    if (isTotal) {
-      const totalBudget = cats.reduce((s, c) => s + (data.budgets[c] || 0), 0);
-      editRow.innerHTML = `<span style="font-size:.8rem;color:var(--muted)">月次予算合計：</span><span style="font-weight:700;font-size:.9rem">¥${totalBudget.toLocaleString()}</span><span style="font-size:.75rem;color:var(--muted)">（各カテゴリ予算の合計）</span>`;
-    } else {
-      editRow.innerHTML = `
-        <label style="font-size:.8rem;color:var(--muted);white-space:nowrap">${escHtml(cat)} 月次予算</label>
-        <input type="number" id="inline-budget-input" value="${monthBudget || ''}" min="0" placeholder="未設定"
-          style="width:130px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;background:var(--bg);color:var(--text)" />
-        <button onclick="saveInlineBudget()" style="padding:6px 14px;border-radius:8px;border:none;background:var(--grad-primary);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">保存</button>
-        <span id="inline-budget-msg" style="font-size:.78rem;color:var(--success)"></span>`;
-    }
-  }
   const weeks = getMonthWeeks(currentYear, currentMonth, data.weekStart ?? 1);
   const n = weeks.length;
   const totalMonthBudget = isTotal ? (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0) : 0;
@@ -1570,10 +1552,14 @@ function renderWeeklyBreakdown() {
   const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
 
   el.innerHTML = weeks.map((w, i) => {
+    const weekKey = `${currentYear}-${currentMonth}-${i}`;
+    const overrideKey = isTotal ? '__total__' : cat;
     const totalPerWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
-    const wBudget = isTotal
+    const autoCalc = isTotal
       ? (totalMonthBudget > 0 ? (i < n - 1 ? totalPerWeek : totalMonthBudget - totalPerWeek * (n - 1)) : 0)
       : (monthBudget > 0 ? (i < n - 1 ? perWeek : monthBudget - perWeek * (n - 1)) : 0);
+    const override = data.weekBudgetOverrides?.[overrideKey]?.[weekKey];
+    const wBudget = (override !== undefined) ? override : autoCalc;
     const ds = new Date(currentYear, currentMonth - 1, w.startDay);
     const de = new Date(currentYear, currentMonth - 1, w.endDay);
     const spent = data.transactions
@@ -1588,22 +1574,43 @@ function renderWeeklyBreakdown() {
     const rawPct = wBudget > 0 ? Math.round(spent / wBudget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
-    const budgetLabel = wBudget > 0
-      ? `¥${spent.toLocaleString()} / ¥${wBudget.toLocaleString()}`
-      : `¥${spent.toLocaleString()}（予算未設定）`;
+    const escapedKey = escHtml(overrideKey);
+    const escapedWeekKey = escHtml(weekKey);
     return `<div class="budget-row">
       <div class="budget-labels">
         <span class="budget-cat" style="font-size:.8rem">
           第${i+1}週 <span style="color:var(--muted);font-weight:400;font-size:.72rem">${fmt(ds)}（${DAY[ds.getDay()]}）〜${fmt(de)}（${DAY[de.getDay()]}）</span>
         </span>
         <span style="display:flex;align-items:center;gap:6px">
-          <span class="budget-amounts">${budgetLabel}</span>
+          <span style="display:flex;align-items:center;gap:4px;font-size:.82rem;color:var(--muted)">¥${spent.toLocaleString()} /</span>
+          <span style="display:flex;align-items:center;gap:2px">
+            ¥<input type="number" min="0" step="1000"
+              value="${wBudget}"
+              style="width:80px;padding:2px 4px;font-size:.82rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);text-align:right"
+              onchange="saveWeekBudget('${escapedKey}','${escapedWeekKey}',this.value)"
+              title="${override !== undefined ? '手動設定中（空欄でリセット）' : '自動計算値（編集可）'}">
+            ${override !== undefined ? '<span style="font-size:.65rem;color:var(--primary);margin-left:2px">設定済</span>' : ''}
+          </span>
           ${wBudget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
         </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
+}
+
+function saveWeekBudget(cat, weekKey, value) {
+  const data = getData();
+  const v = parseInt(value, 10);
+  if (!data.weekBudgetOverrides) data.weekBudgetOverrides = {};
+  if (!data.weekBudgetOverrides[cat]) data.weekBudgetOverrides[cat] = {};
+  if (!isNaN(v) && v >= 0) {
+    data.weekBudgetOverrides[cat][weekKey] = v;
+  } else {
+    delete data.weekBudgetOverrides[cat][weekKey];
+  }
+  saveData(data);
+  renderAll();
 }
 
 // ===== 取引編集 =====
