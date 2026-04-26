@@ -11,16 +11,22 @@
   "lang": "ja",
   "icons": [
     {
+      "src": "icon.png",
+      "sizes": "2000x2000",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "2000x2000",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "icon-512.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "icon-maskable-512.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
     }
   ]
 }

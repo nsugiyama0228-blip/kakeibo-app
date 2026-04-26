@@ -1,8 +1,9 @@
-const CACHE = 'kakeibo-v3';
+const CACHE = 'kakeibo-v4';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './icon.png',
   './icon-512.svg',
   './icon-maskable-512.svg'
 ];
