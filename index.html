@@ -705,6 +705,7 @@
           <div class="section-title" style="margin-bottom:0">📅 月内 週次内訳</div>
           <select id="weekly-cat-select" onchange="renderWeeklyBreakdown()" style="font-size:.82rem;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit"></select>
         </div>
+        <div id="weekly-budget-edit-row" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap"></div>
         <div id="weekly-breakdown-list"></div>
       </div>
     </div>
@@ -1218,6 +1219,19 @@ function saveBudgets() {
   schedulePush();
 }
 
+function saveInlineBudget() {
+  const sel = document.getElementById('weekly-cat-select');
+  const inp = document.getElementById('inline-budget-input');
+  const msg = document.getElementById('inline-budget-msg');
+  if (!sel || !inp) return;
+  const cat = sel.value;
+  const v = parseInt(inp.value) || 0;
+  const data = getData();
+  data.budgets[cat] = v;
+  saveData(data); renderAll(); schedulePush();
+  if (msg) { msg.textContent = '保存しました'; setTimeout(() => { if (msg) msg.textContent = ''; }, 2000); }
+}
+
 function showTab(id) {
   const TABS = ['tab-main','tab-budget','tab-chart','tab-calendar','tab-settings'];
   TABS.forEach(t => document.getElementById(t).style.display = t === id ? '' : 'none');
@@ -1532,6 +1546,22 @@ function renderWeeklyBreakdown() {
 
   const isTotal = cat === TOTAL_KEY;
   const monthBudget = isTotal ? 0 : (data.budgets[cat] || 0);
+
+  // 月次予算の編集行を描画
+  const editRow = document.getElementById('weekly-budget-edit-row');
+  if (editRow) {
+    if (isTotal) {
+      const totalBudget = cats.reduce((s, c) => s + (data.budgets[c] || 0), 0);
+      editRow.innerHTML = `<span style="font-size:.8rem;color:var(--muted)">月次予算合計：</span><span style="font-weight:700;font-size:.9rem">¥${totalBudget.toLocaleString()}</span><span style="font-size:.75rem;color:var(--muted)">（各カテゴリ予算の合計）</span>`;
+    } else {
+      editRow.innerHTML = `
+        <label style="font-size:.8rem;color:var(--muted);white-space:nowrap">${escHtml(cat)} 月次予算</label>
+        <input type="number" id="inline-budget-input" value="${monthBudget || ''}" min="0" placeholder="未設定"
+          style="width:130px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.9rem;background:var(--bg);color:var(--text)" />
+        <button onclick="saveInlineBudget()" style="padding:6px 14px;border-radius:8px;border:none;background:var(--grad-primary);color:#fff;font-size:.82rem;font-weight:700;cursor:pointer">保存</button>
+        <span id="inline-budget-msg" style="font-size:.78rem;color:var(--success)"></span>`;
+    }
+  }
   const weeks = getMonthWeeks(currentYear, currentMonth, data.weekStart ?? 1);
   const n = weeks.length;
   const totalMonthBudget = isTotal ? (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0) : 0;
