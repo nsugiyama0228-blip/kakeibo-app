@@ -1030,7 +1030,7 @@ function updateCategorySelect() {
   const sel  = document.getElementById('tx-category');
   const data = getData();
   const cats = currentType === 'expense' ? data.categories.expense : data.categories.income;
-  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${escHtml(c)}</option>`).join('');
+  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
 }
 
 function setAmount(v) {
@@ -1074,7 +1074,7 @@ function renderTxList(txs, data) {
   el.innerHTML = sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
-        <span class="tx-cat-badge">${data.catIcons[t.category] || CAT_ICONS[t.category] || ''}${escHtml(t.category)}</span>
+        <span class="tx-cat-badge">${escHtml(data.catIcons[t.category] || CAT_ICONS[t.category] || '')}${escHtml(t.category)}</span>
         <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
         <span class="tx-meta">${escHtml(t.date)} · ${escHtml(data.users[t.user]?.name || t.user)}</span>
       </div>
@@ -1110,7 +1110,7 @@ function renderBudget(txs, data) {
       : `¥${spent.toLocaleString()}（予算未設定）`;
     return `<div class="budget-row">
       <div class="budget-labels">
-        <span class="budget-cat"><span class="cat-icon">${data.catIcons[cat]||CAT_ICONS[cat]||''}</span>${escHtml(cat)}</span>
+        <span class="budget-cat"><span class="cat-icon">${escHtml(data.catIcons[cat]||CAT_ICONS[cat]||'')}</span>${escHtml(cat)}</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span class="budget-amounts">${amountText}</span>
           ${budget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
@@ -1125,7 +1125,7 @@ function renderBudgetSettings(data) {
   const el = document.getElementById('budget-settings');
   el.innerHTML = data.categories.expense.map((cat, i) => `
     <div class="form-row">
-      <label>${data.catIcons[cat]||CAT_ICONS[cat]||''} ${escHtml(cat)}</label>
+      <label>${escHtml(data.catIcons[cat]||CAT_ICONS[cat]||'')} ${escHtml(cat)}</label>
       <input type="number" id="budget-idx-${i}" value="${data.budgets[cat] || 0}" min="0" />
     </div>`).join('');
 }
@@ -1372,11 +1372,10 @@ function renderWeeklyBudget(data) {
   const weekExp = data.transactions
     .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= monday && d <= sunday; })
     .reduce((s, t) => s + t.amount, 0);
-  const budgetYear = monday.getFullYear(), budgetMonth = monday.getMonth() + 1;
   const weekStart = data.weekStart ?? 1;
-  const nWeeks = getMonthWeeks(budgetYear, budgetMonth, weekStart).length;
+  const nWeeks = getMonthWeeks(currentYear, currentMonth, weekStart).length;
   const totalMonthBudget = (data.categories.expense || []).reduce((s, c) => s + (data.budgets[c] || 0), 0);
-  const budget = totalMonthBudget > 0 ? Math.round(totalMonthBudget / nWeeks) : 0;
+  const budget = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / nWeeks) : 0;
   const remain = budget - weekExp;
   const pct    = budget > 0 ? Math.min(weekExp / budget * 100, 100) : 0;
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
@@ -1459,7 +1458,7 @@ function showDayDetail(dateStr) {
       ${txs.map(t => `
         <div class="tx-item">
           <div class="tx-left">
-            <span class="tx-cat-badge">${data.catIcons[t.category]||CAT_ICONS[t.category]||''}${escHtml(t.category)}</span>
+            <span class="tx-cat-badge">${escHtml(data.catIcons[t.category]||CAT_ICONS[t.category]||'')}${escHtml(t.category)}</span>
             <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
             <span class="tx-meta">${escHtml(data.users[t.user]?.name || t.user)}</span>
           </div>
@@ -1513,7 +1512,7 @@ function renderWeeklyBreakdown() {
   const prevVal = sel.value;
   const TOTAL_KEY = '__total__';
   sel.innerHTML = `<option value="${TOTAL_KEY}">📊 合計（週次予算）</option>` +
-    cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c]||CAT_ICONS[c]||''} ${escHtml(c)}</option>`).join('');
+    cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c]||CAT_ICONS[c]||'')} ${escHtml(c)}</option>`).join('');
   if (prevVal === TOTAL_KEY || cats.includes(prevVal)) sel.value = prevVal;
   else if (cats.includes('食費')) sel.value = '食費';
   else sel.value = TOTAL_KEY;
@@ -1602,7 +1601,7 @@ function setEditType(t) {
   const data = getData();
   const sel  = document.getElementById('edit-tx-category');
   const cats = t === 'expense' ? data.categories.expense : data.categories.income;
-  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${escHtml(c)}</option>`).join('');
+  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
 }
 
 function saveEditTx() {
@@ -1652,7 +1651,7 @@ function renderCatList() {
     <div id="cat-items">
       ${cats.map((cat, i) => `
         <div class="cat-manage-item">
-          <span class="cat-manage-icon">${data.catIcons[cat] || CAT_ICONS[cat] || '📦'}</span>
+          <span class="cat-manage-icon">${escHtml(data.catIcons[cat] || CAT_ICONS[cat] || '📦')}</span>
           <span class="cat-manage-name">${escHtml(cat)}</span>
           <button class="del-btn" onclick="deleteCat(${i})"${cats.length <= 1 ? ' disabled title="最低1つ必要です"' : ''}>✕</button>
         </div>`).join('')}
@@ -1674,6 +1673,7 @@ function addCat() {
   if (!name) { msg.className = 'msg-area text-danger'; msg.textContent = 'カテゴリ名を入力してください'; return; }
   if (name.length > 20) { msg.className = 'msg-area text-danger'; msg.textContent = 'カテゴリ名は20文字以内です'; return; }
   if (/[<>"'&|]/.test(name)) { msg.className = 'msg-area text-danger'; msg.textContent = '使えない記号が含まれています'; return; }
+  if (icon && (icon.length > 4 || /[<>"'&|]/.test(icon))) { msg.className = 'msg-area text-danger'; msg.textContent = 'アイコンは絵文字1文字にしてください'; return; }
   const data = getData();
   if (data.categories[currentCatTab].includes(name)) {
     msg.className = 'msg-area text-danger'; msg.textContent = '同じ名前のカテゴリが既にあります'; return;
