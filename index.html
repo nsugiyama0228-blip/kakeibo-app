@@ -822,6 +822,7 @@
       <div class="section-title">月次予算の設定</div>
       <div class="budget-settings" id="budget-settings"></div>
       <button class="submit-btn" onclick="saveBudgets()" style="margin-top:14px">保存</button>
+      <div id="budget-save-msg" class="msg-area"></div>
     </div>
   </div>
 </div>
@@ -1014,7 +1015,7 @@ function initApp() {
   const now = new Date();
   currentYear = now.getFullYear(); currentMonth = now.getMonth() + 1;
   initWeek();
-  document.getElementById('tx-date').value = now.toISOString().slice(0, 10);
+  document.getElementById('tx-date').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   updateCategorySelect(); renderAll();
 }
 
@@ -1042,7 +1043,7 @@ function updateCategorySelect() {
   const sel  = document.getElementById('tx-category');
   const data = getData();
   const cats = currentType === 'expense' ? data.categories.expense : data.categories.income;
-  sel.innerHTML = cats.map(c => `<option value="${c}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${c}</option>`).join('');
+  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${data.catIcons[c] || CAT_ICONS[c] || ''} ${escHtml(c)}</option>`).join('');
 }
 
 function setAmount(v) {
@@ -1061,7 +1062,7 @@ function renderAll() {
 
 function monthlyTxs(data) {
   return data.transactions.filter(t => {
-    const d = new Date(t.date);
+    const d = new Date(t.date + 'T00:00:00');
     return d.getFullYear() === currentYear && (d.getMonth() + 1) === currentMonth;
   });
 }
@@ -1172,7 +1173,7 @@ function renderBar(data) {
     let y = currentYear, m = currentMonth - i;
     while (m < 1) { m += 12; y--; }
     months.push(`${y}/${String(m).padStart(2,'0')}`);
-    const txs = data.transactions.filter(t => { const d = new Date(t.date); return d.getFullYear()===y && (d.getMonth()+1)===m; });
+    const txs = data.transactions.filter(t => { const d = new Date(t.date + 'T00:00:00'); return d.getFullYear()===y && (d.getMonth()+1)===m; });
     incomes.push(txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0));
     expenses.push(txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0));
   }
@@ -1220,7 +1221,8 @@ function saveBudgets() {
     if (el) data.budgets[cat] = parseInt(el.value) || 0;
   });
   saveData(data); renderAll();
-  alert('予算を保存しました');
+  const bmsg = document.getElementById('budget-save-msg');
+  if (bmsg) { bmsg.className = 'msg-area text-success'; bmsg.textContent = '予算を保存しました'; }
   schedulePush();
 }
 
