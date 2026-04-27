@@ -1557,9 +1557,9 @@ function renderWeeklyBreakdown() {
   const DAY = ['日','月','火','水','木','金','土'];
   const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
 
+  const overrideKey = isTotal ? '__total__' : cat;
   el.innerHTML = weeks.map((w, i) => {
     const weekKey = `${currentYear}-${currentMonth}-${i}`;
-    const overrideKey = isTotal ? '__total__' : cat;
     const totalPerWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
     const autoCalc = isTotal
       ? (totalMonthBudget > 0 ? (i < n - 1 ? totalPerWeek : totalMonthBudget - totalPerWeek * (n - 1)) : 0)
@@ -1580,8 +1580,6 @@ function renderWeeklyBreakdown() {
     const rawPct = wBudget > 0 ? Math.round(spent / wBudget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
-    const escapedKey = escHtml(overrideKey);
-    const escapedWeekKey = escHtml(weekKey);
     return `<div class="budget-row">
       <div class="budget-labels">
         <span class="budget-cat" style="font-size:.8rem">
@@ -1592,9 +1590,10 @@ function renderWeeklyBreakdown() {
           <span style="display:flex;align-items:center;gap:2px">
             ¥<input type="number" min="0" step="1000"
               value="${wBudget}"
+              data-override-key="${escHtml(overrideKey)}"
+              data-week-key="${escHtml(weekKey)}"
               style="width:80px;padding:2px 4px;font-size:.82rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);text-align:right"
-              onchange="saveWeekBudget('${escapedKey}','${escapedWeekKey}',this.value)"
-              title="${override !== undefined ? '手動設定中（空欄でリセット）' : '自動計算値（編集可）'}">
+              title="${override !== undefined ? '手動設定中' : '自動計算値（編集可）'}">
             ${override !== undefined ? '<span style="font-size:.65rem;color:var(--primary);margin-left:2px">設定済</span>' : ''}
           </span>
           ${wBudget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
@@ -1603,6 +1602,15 @@ function renderWeeklyBreakdown() {
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
+
+  el.querySelectorAll('input[data-week-key]').forEach(input => {
+    input.addEventListener('change', () => {
+      saveWeekBudget(input.dataset.overrideKey, input.dataset.weekKey, input.value);
+    });
+    input.addEventListener('blur', () => {
+      saveWeekBudget(input.dataset.overrideKey, input.dataset.weekKey, input.value);
+    });
+  });
 }
 
 function saveWeekBudget(cat, weekKey, value) {
@@ -1610,9 +1618,12 @@ function saveWeekBudget(cat, weekKey, value) {
   const v = parseInt(value, 10);
   if (!data.weekBudgetOverrides) data.weekBudgetOverrides = {};
   if (!data.weekBudgetOverrides[cat]) data.weekBudgetOverrides[cat] = {};
+  const current = data.weekBudgetOverrides[cat][weekKey];
   if (!isNaN(v) && v >= 0) {
+    if (current === v) return;
     data.weekBudgetOverrides[cat][weekKey] = v;
   } else {
+    if (current === undefined) return;
     delete data.weekBudgetOverrides[cat][weekKey];
   }
   saveData(data);
