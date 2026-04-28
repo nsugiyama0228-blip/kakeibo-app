@@ -715,7 +715,10 @@
       <div class="budget-list" id="budget-list"></div>
       <div style="margin-top:20px;border-top:1.5px solid var(--border);padding-top:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap">
-          <div class="section-title" style="margin-bottom:0">📅 月内 週次内訳</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="section-title" style="margin-bottom:0">📅 月内 週次内訳</div>
+            <button onclick="openWeekEditModal()" title="週の区切りを変更" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:3px 9px;cursor:pointer;font-size:.78rem;color:var(--muted);font-family:inherit;transition:all .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">✏️ 週を変更</button>
+          </div>
           <select id="weekly-cat-select" onchange="renderWeeklyBreakdown()" style="font-size:.82rem;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit"></select>
         </div>
         <div id="weekly-breakdown-list"></div>
@@ -2133,6 +2136,88 @@ async function updateUserPin(uid) {
   document.getElementById('upin-new-' + uid).value = '';
   document.getElementById('upin-cfm-' + uid).value = '';
 }
+
+// ===== 週区切り編集モーダル =====
+let _weekEditRows = [];
+
+function openWeekEditModal() {
+  const data = getData();
+  const weeks = getMonthWeeks(currentYear, currentMonth, data.weekStart ?? 1, data.customWeekStarts);
+  _weekEditRows = weeks.map(w => w.startDay);
+  _renderWeekEditRows();
+  document.getElementById('weekEditModal').style.display = 'flex';
+}
+
+function closeWeekEditModal() {
+  document.getElementById('weekEditModal').style.display = 'none';
+}
+
+function _renderWeekEditRows() {
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const el = document.getElementById('week-edit-rows');
+  el.innerHTML = _weekEditRows.map((start, i) => {
+    const endDay = i < _weekEditRows.length - 1 ? _weekEditRows[i + 1] - 1 : daysInMonth;
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:10px 12px;background:var(--bg);border-radius:10px">
+      <span style="min-width:44px;font-size:.82rem;font-weight:600;color:var(--text)">第${i + 1}週</span>
+      <input type="number" min="1" max="28" value="${start}" ${i === 0 ? 'readonly style="width:52px;padding:6px;border:1.5px solid var(--border);border-radius:8px;background:var(--border);color:var(--muted);text-align:center;font-family:inherit;font-size:.88rem"' : `style="width:52px;padding:6px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);text-align:center;font-family:inherit;font-size:.88rem" oninput="
+        const v=parseInt(this.value)||1;
+        _weekEditRows[${i}]=v;
+        _renderWeekEditRows();"`}>
+      <span style="font-size:.82rem;color:var(--muted)">日 〜 ${endDay}日</span>
+      ${i > 0 ? `<button onclick="_removeWeekRow(${i})" style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;padding:2px 6px">✕</button>` : '<span style="margin-left:auto;width:28px"></span>'}
+    </div>`;
+  }).join('');
+}
+
+function _removeWeekRow(i) {
+  _weekEditRows.splice(i, 1);
+  _renderWeekEditRows();
+}
+
+function addWeekRow() {
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const last = _weekEditRows[_weekEditRows.length - 1] || 1;
+  const next = Math.min(last + 7, daysInMonth - 1);
+  _weekEditRows.push(next);
+  _renderWeekEditRows();
+}
+
+function saveWeekStarts() {
+  const data = getData();
+  const starts = [...new Set(_weekEditRows.map(Number).filter(n => !isNaN(n) && n >= 1 && n <= 28))].sort((a, b) => a - b);
+  if (starts.length === 0 || starts[0] !== 1) starts.unshift(1);
+  data.customWeekStarts = starts.length > 1 ? starts : null;
+  saveData(data); renderAll();
+  closeWeekEditModal();
+}
+
+function resetWeekStarts() {
+  const data = getData();
+  data.customWeekStarts = null;
+  saveData(data); renderAll();
+  closeWeekEditModal();
+}
 </script>
+<!-- ===== 週区切り編集モーダル ===== -->
+<div class="modal-overlay" id="weekEditModal" onclick="closeWeekEditModal()" style="display:none">
+  <div class="modal-sheet" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <button class="modal-close-btn" onclick="closeWeekEditModal()">✕</button>
+    <div class="modal-title">📅 週の区切りを設定</div>
+    <div class="modal-scroll">
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:16px;line-height:1.6">
+        各週の開始日を設定します。第1週は必ず1日始まりです。<br>
+        「リセット」で曜日ベースの自動分割に戻ります。
+      </p>
+      <div id="week-edit-rows"></div>
+      <button onclick="addWeekRow()" style="width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:10px;background:none;cursor:pointer;font-size:.88rem;color:var(--muted);font-family:inherit;margin-top:4px;transition:all .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">＋ 週を追加</button>
+    </div>
+    <div style="display:flex;gap:8px;padding:16px 20px;border-top:1px solid var(--border)">
+      <button onclick="resetWeekStarts()" style="flex:1;padding:11px;border:1.5px solid var(--border);border-radius:10px;background:none;cursor:pointer;font-size:.88rem;color:var(--muted);font-family:inherit">リセット</button>
+      <button onclick="saveWeekStarts()" style="flex:2;padding:11px;border:none;border-radius:10px;background:var(--grad-primary);color:#fff;cursor:pointer;font-size:.88rem;font-weight:700;font-family:inherit">保存</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
