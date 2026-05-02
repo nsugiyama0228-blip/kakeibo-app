@@ -742,31 +742,7 @@
 
   <!-- カレンダータブ -->
   <div id="tab-calendar" style="display:none">
-    <div class="weekly-budget-card animate-fadeup">
-      <div class="week-label">📅 週次予算</div>
-      <div class="week-nav-row">
-        <button class="week-nav-btn" onclick="changeWeek(-1)" title="前の週">◀</button>
-        <div class="week-dates" id="week-dates">-</div>
-        <button class="week-nav-btn" onclick="changeWeek(1)" title="次の週">▶</button>
-      </div>
-      <div class="week-stats">
-        <div class="week-stat">
-          <span class="week-stat-label">支出</span>
-          <span class="week-stat-value" id="week-expense">¥0</span>
-        </div>
-        <div class="week-stat">
-          <span class="week-stat-label">週次予算</span>
-          <span class="week-stat-value" id="week-budget-val">未設定</span>
-        </div>
-        <div class="week-stat">
-          <span class="week-stat-label">残り</span>
-          <span class="week-stat-value" id="week-remain">-</span>
-        </div>
-      </div>
-      <div class="week-bar-bg"><div class="week-bar" id="week-bar" style="width:0%"></div></div>
-      <div style="text-align:center"><button class="week-today-btn" id="week-today-btn" onclick="resetWeek()" style="display:none">今週へ戻る</button></div>
-    </div>
-    <div class="card animate-fadeup" style="animation-delay:.05s">
+    <div class="card animate-fadeup">
       <div class="section-title">月間カレンダー</div>
       <div class="cal-header" id="cal-header"></div>
       <div class="cal-grid" id="cal-grid"></div>
