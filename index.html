@@ -1139,7 +1139,7 @@ function renderTxList(txs, data) {
         ${totalInc > 0 ? `<span class="income">+¥${totalInc.toLocaleString()}</span>` : ''}
       </span>
     </div>` : '';
-  el.innerHTML = chipsHtml + sorted.map(t => `
+  el.innerHTML = chipsHtml + summaryHtml + sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
         <span class="tx-cat-badge">${escHtml(data.catIcons[t.category] || CAT_ICONS[t.category] || '')}${escHtml(t.category)}</span>
@@ -1151,7 +1151,7 @@ function renderTxList(txs, data) {
         <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
         <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')" title="削除">✕</button>
       </div>
-    </div>`).join('') + summaryHtml;
+    </div>`).join('');
 }
 
 function renderBudget(txs, data) {
