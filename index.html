@@ -339,7 +339,15 @@
     .submit-btn:active { transform: translateY(0); }
 
     /* 取引リスト */
-    .tx-list { max-height: 340px; overflow-y: auto; }
+    .tx-list { max-height: 400px; overflow-y: auto; }
+    .cat-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .cat-chip {
+      border: 1.5px solid var(--border); background: var(--surface); color: var(--muted);
+      border-radius: 99px; padding: 3px 12px; font-size: .75rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .cat-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
     .tx-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 11px 6px; border-bottom: 1px solid var(--border);
@@ -1019,7 +1027,7 @@ function logout() {
 }
 
 // ===== アプリ =====
-let currentYear, currentMonth, currentType = 'expense';
+let currentYear, currentMonth, currentType = 'expense', selectedCatFilter = null;
 let pieChart = null, barChart = null;
 
 function initApp() {
@@ -1035,6 +1043,7 @@ function changeMonth(d) {
   if (currentMonth > 12) { currentMonth = 1; currentYear++; }
   if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
   currentWeekDate = null;
+  selectedCatFilter = null;
   renderAll();
   const calTab = document.getElementById('tab-calendar');
   if (calTab && calTab.style.display !== 'none') renderCalendarTab(getData());
@@ -1091,14 +1100,30 @@ function renderSummary(txs) {
   document.getElementById('total-balance').textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
 }
 
+function setCatFilter(cat) {
+  selectedCatFilter = cat;
+  const data = getData();
+  renderTxList(monthlyTxs(data), data);
+}
+
 function renderTxList(txs, data) {
   const el = document.getElementById('tx-list');
   if (!txs.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>この月の記録はありません</div>';
     return;
   }
-  const sorted = [...txs].sort((a,b) => new Date(b.date) - new Date(a.date));
-  el.innerHTML = sorted.map(t => `
+  const cats = [...new Set(txs.map(t => t.category))];
+  const chipsHtml = `<div class="cat-filter-chips">
+    <button class="cat-chip ${!selectedCatFilter ? 'active' : ''}" onclick="setCatFilter(null)">すべて</button>
+    ${cats.map(cat => `<button class="cat-chip ${selectedCatFilter === cat ? 'active' : ''}" onclick="setCatFilter('${escHtml(cat)}')">${escHtml(data.catIcons[cat] || CAT_ICONS[cat] || '')} ${escHtml(cat)}</button>`).join('')}
+  </div>`;
+  const filtered = selectedCatFilter ? txs.filter(t => t.category === selectedCatFilter) : txs;
+  const sorted = [...filtered].sort((a,b) => new Date(b.date) - new Date(a.date));
+  if (!sorted.length) {
+    el.innerHTML = chipsHtml + '<div class="empty"><div class="empty-icon">📋</div>該当する取引がありません</div>';
+    return;
+  }
+  el.innerHTML = chipsHtml + sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
         <span class="tx-cat-badge">${escHtml(data.catIcons[t.category] || CAT_ICONS[t.category] || '')}${escHtml(t.category)}</span>
