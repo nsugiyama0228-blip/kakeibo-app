@@ -340,7 +340,7 @@
 
     /* 取引リスト */
     .tx-list { max-height: 400px; overflow-y: auto; }
-    .cat-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+    .cat-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; padding-top: 4px; }
     .cat-chip {
       border: 1.5px solid var(--border); background: var(--surface); color: var(--muted);
       border-radius: 99px; padding: 3px 12px; font-size: .75rem; font-weight: 600;
