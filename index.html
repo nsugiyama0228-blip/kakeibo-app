@@ -1058,6 +1058,7 @@ function changeMonth(d) {
   currentMonth += d;
   if (currentMonth > 12) { currentMonth = 1; currentYear++; }
   if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
+  currentWeekDate = null;
   renderAll();
   const calTab = document.getElementById('tab-calendar');
   if (calTab && calTab.style.display !== 'none') renderCalendarTab(getData());
@@ -1498,41 +1499,52 @@ function renderCalendarHeader(data) {
 
 function renderWeeklyBudget(data) {
   if (!currentWeekDate) initWeek();
-  const { monday, sunday } = getWeekRange();
+  const { monday } = getWeekRange();
   const weekStart = data.weekStart ?? 1;
 
-  // 週を currentMonth 内にクリップ
   const firstOfMonth = new Date(currentYear, currentMonth - 1, 1);
   firstOfMonth.setHours(0, 0, 0, 0);
   const lastOfMonth = new Date(currentYear, currentMonth, 0);
   lastOfMonth.setHours(23, 59, 59, 999);
-  const clippedStart = monday < firstOfMonth ? firstOfMonth : monday;
-  const clippedEnd   = sunday > lastOfMonth  ? lastOfMonth  : sunday;
 
-  const weekExp = data.transactions
-    .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= clippedStart && d <= clippedEnd; })
-    .reduce((s, t) => s + t.amount, 0);
   const weeks = getMonthWeeks(currentYear, currentMonth, weekStart, data.customWeekStarts);
   const n = weeks.length;
+
+  // 月内のどの週かを特定（週次内訳と同じgetMonthWeeksを使う）
+  const clippedStart = monday < firstOfMonth ? firstOfMonth : (monday > lastOfMonth ? firstOfMonth : monday);
+  const refDay = clippedStart.getDate();
+  let weekIdx = weeks.findIndex(w => refDay >= w.startDay && refDay <= w.endDay);
+  if (weekIdx < 0) weekIdx = 0;
+
+  // 週次内訳と同じ週の境界を使って支出を計算（ズレをなくす）
+  const wk = weeks[weekIdx];
+  const wkStart = new Date(currentYear, currentMonth - 1, wk.startDay); wkStart.setHours(0,0,0,0);
+  const wkEnd   = new Date(currentYear, currentMonth - 1, wk.endDay);   wkEnd.setHours(23,59,59,999);
+
+  const weekExp = data.transactions
+    .filter(t => { const d = new Date(t.date + 'T00:00:00'); return t.type === 'expense' && d >= wkStart && d <= wkEnd; })
+    .reduce((s, t) => s + t.amount, 0);
+
   const mBudgets = getMonthBudgets(data, currentYear, currentMonth);
   const totalMonthBudget = (data.categories.expense || []).reduce((s, c) => s + (mBudgets[c] || 0), 0);
   const perWeek = totalMonthBudget > 0 ? Math.floor(totalMonthBudget / n) : 0;
-  // クリップ後の開始日で週インデックスを特定
-  const refDay  = clippedStart.getDate();
-  const weekIdx = weeks.findIndex(w => refDay >= w.startDay && refDay <= w.endDay);
   const autoCalc = totalMonthBudget > 0
-    ? (weekIdx >= 0 ? (weekIdx < n - 1 ? perWeek : totalMonthBudget - perWeek * (n - 1)) : perWeek)
+    ? (weekIdx < n - 1 ? perWeek : totalMonthBudget - perWeek * (n - 1))
     : 0;
-  const weekKey = weekIdx >= 0 ? `${currentYear}-${currentMonth}-${weekIdx}` : null;
-  const override = weekKey ? data.weekBudgetOverrides?.['__total__']?.[weekKey] : undefined;
+  const weekKey = `${currentYear}-${currentMonth}-${weekIdx}`;
+  const override = data.weekBudgetOverrides?.['__total__']?.[weekKey];
   const budget = override !== undefined ? override : autoCalc;
   const remain = budget - weekExp;
   const pct    = budget > 0 ? Math.min(weekExp / budget * 100, 100) : 0;
   const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
   const fmt    = d => `${d.getMonth() + 1}/${d.getDate()}`;
-
   const DAY = ['日','月','火','水','木','金','土'];
-  document.getElementById('week-dates').textContent   = `${fmt(clippedStart)}（${DAY[clippedStart.getDay()]}）〜 ${fmt(clippedEnd)}（${DAY[clippedEnd.getDay()]}）${isCurrentWeek() ? '・今週' : ''}`;
+
+  // 今日がこの週に含まれるかチェック
+  const todayD = new Date(); todayD.setHours(0,0,0,0);
+  const isThisWeek = todayD >= wkStart && todayD <= wkEnd;
+
+  document.getElementById('week-dates').textContent = `第${weekIdx+1}週 ${fmt(wkStart)}（${DAY[wkStart.getDay()]}）〜 ${fmt(wkEnd)}（${DAY[wkEnd.getDay()]}）${isThisWeek ? '・今週' : ''}`;
   document.getElementById('week-expense').textContent = '¥' + weekExp.toLocaleString();
   document.getElementById('week-budget-val').textContent = budget > 0 ? '¥' + budget.toLocaleString() : '未設定';
   const remEl = document.getElementById('week-remain');
@@ -1719,26 +1731,32 @@ function renderWeeklyBreakdown() {
     const rawPct = wBudget > 0 ? Math.round(spent / wBudget * 100) : 0;
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
-    return `<div class="budget-row">
-      <div class="budget-labels">
-        <span class="budget-cat" style="font-size:.8rem">
-          第${i+1}週 <span style="color:var(--muted);font-weight:400;font-size:.72rem">${fmt(ds)}（${DAY[ds.getDay()]}）〜${fmt(de)}（${DAY[de.getDay()]}）</span>
-        </span>
-        <span style="display:flex;align-items:center;gap:6px">
-          <span style="display:flex;align-items:center;gap:4px;font-size:.82rem;color:var(--muted)">¥${spent.toLocaleString()} /</span>
-          <span style="display:flex;align-items:center;gap:2px">
-            ¥<input type="number" min="0" step="1000"
-              value="${wBudget}"
-              data-override-key="${escHtml(overrideKey)}"
-              data-week-key="${escHtml(weekKey)}"
-              style="width:80px;padding:2px 4px;font-size:.82rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);text-align:right"
-              title="${override !== undefined ? '手動設定中' : '自動計算値（編集可）'}">
-            ${override !== undefined ? '<span style="font-size:.65rem;color:var(--primary);margin-left:2px">設定済</span>' : ''}
-          </span>
-          ${wBudget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
+    const remain = wBudget - spent;
+    return `<div style="border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;background:var(--card)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:.9rem;font-weight:700;color:var(--text)">第${i+1}週</span>
+          <span style="font-size:.72rem;color:var(--muted)">${fmt(ds)}（${DAY[ds.getDay()]}）〜 ${fmt(de)}（${DAY[de.getDay()]}）</span>
+        </div>
+        ${wBudget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:.8rem;color:var(--muted)">支出</span>
+        <span style="font-size:.88rem;font-weight:700;color:var(--danger)">¥${spent.toLocaleString()}</span>
+        <span style="font-size:.8rem;color:var(--muted)">/</span>
+        <span style="font-size:.8rem;color:var(--muted)">予算</span>
+        <span style="display:flex;align-items:center;gap:3px">
+          <span style="font-size:.82rem;color:var(--muted)">¥</span><input type="number" min="0" step="1000"
+            value="${wBudget}"
+            data-override-key="${escHtml(overrideKey)}"
+            data-week-key="${escHtml(weekKey)}"
+            style="width:96px;padding:4px 6px;font-size:.85rem;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);text-align:right;font-family:inherit"
+            title="${override !== undefined ? '手動設定中' : '自動計算値（編集可）'}">
+          ${override !== undefined ? '<span style="font-size:.65rem;color:var(--primary);font-weight:600;margin-left:2px">手動</span>' : ''}
         </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
+      ${wBudget > 0 ? `<div style="font-size:.72rem;color:${remain < 0 ? 'var(--danger)' : 'var(--muted)'};text-align:right;margin-top:5px">${remain < 0 ? '超過 ¥' + Math.abs(remain).toLocaleString() : '残 ¥' + remain.toLocaleString()}</div>` : ''}
     </div>`;
   }).join('');
 
