@@ -348,6 +348,12 @@
     }
     .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
     .cat-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .cat-filter-summary {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+      background: rgba(99,102,241,.08); font-size: .85rem; font-weight: 600; color: var(--text);
+    }
+    .cat-filter-summary-amount { display: flex; gap: 10px; }
     .tx-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 11px 6px; border-bottom: 1px solid var(--border);
@@ -1123,6 +1129,16 @@ function renderTxList(txs, data) {
     el.innerHTML = chipsHtml + '<div class="empty"><div class="empty-icon">📋</div>該当する取引がありません</div>';
     return;
   }
+  const totalExp = sorted.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
+  const totalInc = sorted.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const summaryHtml = selectedCatFilter ? `
+    <div class="cat-filter-summary">
+      <span>${escHtml(data.catIcons[selectedCatFilter] || CAT_ICONS[selectedCatFilter] || '')} ${escHtml(selectedCatFilter)}の合計</span>
+      <span class="cat-filter-summary-amount">
+        ${totalExp > 0 ? `<span class="expense">-¥${totalExp.toLocaleString()}</span>` : ''}
+        ${totalInc > 0 ? `<span class="income">+¥${totalInc.toLocaleString()}</span>` : ''}
+      </span>
+    </div>` : '';
   el.innerHTML = chipsHtml + sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
@@ -1135,7 +1151,7 @@ function renderTxList(txs, data) {
         <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
         <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')" title="削除">✕</button>
       </div>
-    </div>`).join('');
+    </div>`).join('') + summaryHtml;
 }
 
 function renderBudget(txs, data) {
