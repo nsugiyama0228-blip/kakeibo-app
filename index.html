@@ -340,7 +340,7 @@
 
     /* 取引リスト */
     .tx-list { max-height: 400px; overflow-y: auto; }
-    .cat-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; padding-top: 4px; }
+    .cat-filter-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); z-index: 1; padding-top: 4px; }
     .cat-chip {
       border: 1.5px solid var(--border); background: var(--surface); color: var(--muted);
       border-radius: 99px; padding: 3px 12px; font-size: .75rem; font-weight: 600;
@@ -1012,6 +1012,7 @@ async function verifyPin() {
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
     initApp();
     pullFromGist().then(pulled => { if (pulled) renderAll(); });
+    startSyncPolling();
   } else {
     const errEl = document.getElementById('pin-error');
     errEl.textContent = 'PINが違います';
@@ -1022,6 +1023,17 @@ async function verifyPin() {
   }
 }
 
+let syncPollTimer = null;
+function startSyncPolling() {
+  if (syncPollTimer) clearInterval(syncPollTimer);
+  syncPollTimer = setInterval(() => {
+    pullFromGist().then(pulled => { if (pulled) renderAll(); });
+  }, 60000);
+}
+function stopSyncPolling() {
+  if (syncPollTimer) { clearInterval(syncPollTimer); syncPollTimer = null; }
+}
+
 function logout() {
   document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
   document.body.style.overflow = '';
@@ -1030,6 +1042,7 @@ function logout() {
   document.getElementById('pin-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   destroyCharts();
+  stopSyncPolling();
 }
 
 // ===== アプリ =====
@@ -1973,7 +1986,12 @@ function schedulePush() {
   if (!cfg.token || !cfg.gistId) return;
   if (pushTimer) clearTimeout(pushTimer);
   setSyncStatus('syncing');
-  pushTimer = setTimeout(() => { pushTimer = null; pushToGist(); }, 1500);
+  pushTimer = setTimeout(async () => {
+    pushTimer = null;
+    // 相手の最新変更を先に取り込んでから上書き防止
+    await pullFromGist();
+    await pushToGist();
+  }, 1500);
 }
 
 async function pushToGist() {
