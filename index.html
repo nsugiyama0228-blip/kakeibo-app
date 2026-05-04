@@ -2276,6 +2276,7 @@ function saveWeekStarts() {
   data.customWeekStarts = starts.length > 1 ? starts : null;
   saveData(data); renderAll();
   closeWeekEditModal();
+  schedulePush();
 }
 
 function resetWeekStarts() {
@@ -2283,6 +2284,7 @@ function resetWeekStarts() {
   data.customWeekStarts = null;
   saveData(data); renderAll();
   closeWeekEditModal();
+  schedulePush();
 }
 </script>
 <!-- ===== 週区切り編集モーダル ===== -->
