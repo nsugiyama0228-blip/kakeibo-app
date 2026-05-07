@@ -2037,7 +2037,7 @@ function mergeRemoteData(remote) {
   const local = getData();
   const deletedSet = new Set([...(local.deletedIds || []), ...(remote.deletedIds || [])]);
   const txMap = {};
-  [...(local.transactions || []), ...(remote.transactions || [])].forEach(t => { txMap[t.id] = t; });
+  [...(remote.transactions || []), ...(local.transactions || [])].forEach(t => { txMap[t.id] = t; });
   deletedSet.forEach(id => delete txMap[id]);
   local.transactions = Object.values(txMap);
   local.deletedIds = [...deletedSet];
