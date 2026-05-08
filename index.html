@@ -2047,7 +2047,19 @@ function mergeRemoteData(remote) {
   if (typeof remote.weeklyBudget === 'number') local.weeklyBudget = remote.weeklyBudget;
   if (typeof remote.weekStart === 'number' && remote.weekStart >= 0 && remote.weekStart <= 6) local.weekStart = remote.weekStart;
   if ('customWeekStarts' in remote) local.customWeekStarts = remote.customWeekStarts;
-  if (remote.weekBudgetOverrides && typeof remote.weekBudgetOverrides === 'object') local.weekBudgetOverrides = remote.weekBudgetOverrides;
+  if (remote.weekBudgetOverrides && typeof remote.weekBudgetOverrides === 'object') {
+    if (!local.weekBudgetOverrides || typeof local.weekBudgetOverrides !== 'object') {
+      local.weekBudgetOverrides = remote.weekBudgetOverrides;
+    } else {
+      for (const cat of Object.keys(remote.weekBudgetOverrides)) {
+        if (!local.weekBudgetOverrides[cat]) {
+          local.weekBudgetOverrides[cat] = remote.weekBudgetOverrides[cat];
+        } else {
+          local.weekBudgetOverrides[cat] = { ...remote.weekBudgetOverrides[cat], ...local.weekBudgetOverrides[cat] };
+        }
+      }
+    }
+  }
   saveData(local);
 }
 
