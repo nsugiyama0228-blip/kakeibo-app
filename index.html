@@ -1988,8 +1988,8 @@ function schedulePush() {
   setSyncStatus('syncing');
   pushTimer = setTimeout(async () => {
     pushTimer = null;
-    // 相手の最新変更を先に取り込んでから上書き防止
-    await pullFromGist();
+    // 自分の変更は確実に送信する（pullで上書きされないように）
+    // 相手の変更は60秒ごとのポーリングで取り込む
     await pushToGist();
   }, 1500);
 }
