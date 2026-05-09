@@ -1780,7 +1780,13 @@ async function pushToGist() {
     if (r.ok) {
       cfg.lastSync = new Date().toISOString(); saveSyncConfig(cfg);
       setSyncStatus('ok');
-    } else { setSyncStatus('error', 'アップロードエラー'); }
+    } else {
+      const reason = r.status === 401 ? 'アップロードエラー: 認証エラー（トークン期限切れの可能性）'
+                   : r.status === 404 ? 'アップロードエラー: Gistが見つかりません（連携コード違い or 削除済み）'
+                   : r.status === 403 ? 'アップロードエラー: アクセス権限エラー（トークンのgist権限なし）'
+                   : `アップロードエラー (${r.status})`;
+      setSyncStatus('error', reason);
+    }
   } catch(e) { setSyncStatus('error', 'ネットワークエラー'); }
 }
 
@@ -1792,7 +1798,14 @@ async function pullFromGist() {
     const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github+json' }
     });
-    if (!r.ok) { setSyncStatus('error', '取得エラー'); return false; }
+    if (!r.ok) {
+      const reason = r.status === 401 ? '取得エラー: 認証エラー（トークン期限切れの可能性）'
+                   : r.status === 404 ? '取得エラー: Gistが見つかりません（連携コード違い or 削除済み）'
+                   : r.status === 403 ? '取得エラー: アクセス権限エラー（トークンのgist権限なし）'
+                   : `取得エラー (${r.status})`;
+      setSyncStatus('error', reason);
+      return false;
+    }
     const gist = await r.json();
     const content = gist.files['kakeibo_data.json']?.content;
     if (!content) { setSyncStatus('ok'); return false; }
