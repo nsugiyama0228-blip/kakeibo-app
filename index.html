@@ -316,19 +316,6 @@
       box-shadow: 0 2px 8px rgba(16,185,129,.3);
     }
 
-    /* クイック入力ボタン */
-    .quick-amounts { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-    .quick-btn {
-      padding: 5px 10px; border: 1.5px solid var(--border); border-radius: 99px;
-      background: var(--bg); cursor: pointer; font-size: .78rem; font-weight: 600;
-      color: var(--muted); transition: all .15s; font-family: inherit;
-    }
-    .quick-btn:hover {
-      border-color: var(--primary); color: var(--primary);
-      background: rgba(99,102,241,.08);
-    }
-    .quick-btn:active { transform: scale(.94); }
-
     .submit-btn {
       width: 100%; padding: 12px; background: var(--grad-primary); color: #fff;
       border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
@@ -655,17 +642,6 @@
           <div class="form-row">
             <label>金額 (円)</label>
             <input type="number" id="tx-amount" placeholder="例: 1500" min="0" />
-          </div>
-          <div class="form-row form-full">
-            <label>クイック入力</label>
-            <div class="quick-amounts">
-              <button class="quick-btn" onclick="setAmount(100)">¥100</button>
-              <button class="quick-btn" onclick="setAmount(500)">¥500</button>
-              <button class="quick-btn" onclick="setAmount(1000)">¥1,000</button>
-              <button class="quick-btn" onclick="setAmount(3000)">¥3,000</button>
-              <button class="quick-btn" onclick="setAmount(5000)">¥5,000</button>
-              <button class="quick-btn" onclick="setAmount(10000)">¥10,000</button>
-            </div>
           </div>
           <div class="form-row">
             <label>カテゴリ</label>
@@ -1035,11 +1011,6 @@ function updateCategorySelect() {
   const data = getData();
   const cats = currentType === 'expense' ? data.categories.expense : data.categories.income;
   sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
-}
-
-function setAmount(v) {
-  document.getElementById('tx-amount').value = v;
-  document.getElementById('tx-amount').focus();
 }
 
 function renderAll() {
