@@ -1884,7 +1884,8 @@ function renderSyncSettings() {
       <div style="display:flex;gap:8px">
         <button class="submit-btn" onclick="manualSync()" style="flex:1">🔄 今すぐ同期</button>
         <button class="submit-btn" onclick="disconnectSync()" style="flex:0 0 auto;width:auto;padding:12px 16px;background:none;color:var(--danger);border:1.5px solid var(--danger);box-shadow:none">解除</button>
-      </div>`;
+      </div>
+      <button onclick="updateTokenOnly()" style="margin-top:10px;background:none;border:none;color:var(--muted);font-size:.85rem;text-decoration:underline;cursor:pointer;padding:4px 0">🔑 トークンだけ更新する（Gist IDはそのまま）</button>`;
   } else {
     el.innerHTML = `
       <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;line-height:1.6">同期が未設定です。<br>配偶者のデバイスに表示された連携コードを入力すると、取引・予算データを共有できます。</p>
@@ -1926,6 +1927,24 @@ async function setupSync() {
   const ok = await pullFromGist();
   if (ok) renderAll();
   await pushToGist();
+  renderSyncSettings();
+}
+
+async function updateTokenOnly() {
+  const cfg = getSyncConfig();
+  if (!cfg.gistId) { alert('Gist IDが設定されていません。先に連携コードで設定してください。'); return; }
+  const newToken = prompt('新しいGitHubトークンを貼り付けてください\n（ghp_ で始まる文字列）\n\nGist IDはそのまま保持されます。');
+  if (newToken === null) return;
+  const trimmed = newToken.trim();
+  if (!trimmed) { alert('トークンが空です'); return; }
+  saveSyncConfig({ gistId: cfg.gistId, token: trimmed });
+  setSyncStatus('syncing');
+  const ok = await pullFromGist();
+  if (ok) {
+    renderAll();
+    await pushToGist();
+    alert('トークンを更新しました。同期が再開されます。');
+  }
   renderSyncSettings();
 }
 
