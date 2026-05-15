@@ -1,7 +1,7 @@
 {
-  "name": "家計管理",
-  "short_name": "家計管理",
-  "description": "夫婦で使える家計管理アプリ",
+  "name": "予算管理",
+  "short_name": "予算管理",
+  "description": "夫婦で使える予算管理アプリ",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
