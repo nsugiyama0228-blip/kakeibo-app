@@ -52,6 +52,9 @@
         --text:   #FAF0DC;
         --muted:  #C4A882;
         --border: #4A3020;
+        /* 文字用の赤・緑は暗い背景でも読める明るさに */
+        --danger:  #E8916C;
+        --success: #93C46E;
         --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
         --shadow:    0 4px 16px rgba(0,0,0,.4);
         --shadow-lg: 0 10px 40px rgba(0,0,0,.5);
@@ -257,9 +260,9 @@
     }
 
     @media (max-width: 380px) {
-      /* タブを絵文字のみに */
-      .tab-btn { font-size: 1.1rem; padding: 9px 2px; }
-      .tab-btn .tab-text { display: none; }
+      /* タブは絵文字の下に小さくラベルを表示 */
+      .tab-btn { font-size: 1.05rem; padding: 6px 2px 5px; line-height: 1.2; }
+      .tab-btn .tab-text { display: block; font-size: .64rem; font-weight: 600; letter-spacing: .02em; }
     }
 
     .section-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; letter-spacing: -.01em; }
@@ -350,24 +353,24 @@
     .tx-item:last-child { border-bottom: none; }
     .tx-left { display: flex; flex-direction: column; gap: 2px; }
     .tx-cat-badge {
-      display: inline-flex; align-items: center; gap: 4px; font-size: .72rem;
+      display: inline-flex; align-items: center; gap: 4px; font-size: .75rem;
       background: rgba(99,102,241,.1); color: var(--primary); border-radius: 99px;
       padding: 2px 8px; font-weight: 600; width: fit-content; margin-bottom: 1px;
     }
     .tx-note { font-size: .9rem; font-weight: 500; }
-    .tx-meta { font-size: .7rem; color: var(--muted); }
+    .tx-meta { font-size: .75rem; color: var(--muted); }
     .tx-right { display: flex; align-items: center; gap: 8px; }
     .tx-amount { font-weight: 700; font-size: 1rem; }
     .tx-amount.income  { color: var(--success); }
     .tx-amount.expense { color: var(--danger); }
     .del-btn {
       background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: .82rem; padding: 4px 7px; border-radius: 8px; transition: all .15s;
+      font-size: .95rem; padding: 8px 9px; border-radius: 8px; transition: all .15s;
     }
     .del-btn:hover { background: rgba(239,68,68,.1); color: var(--danger); }
     .edit-btn {
       background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: .82rem; padding: 4px 7px; border-radius: 8px; transition: all .15s;
+      font-size: .95rem; padding: 8px 9px; border-radius: 8px; transition: all .15s;
     }
     .edit-btn:hover { background: rgba(99,102,241,.1); color: var(--primary); }
 
@@ -510,8 +513,8 @@
       color: var(--text);
     }
     .cal-cell.today .cal-day-num { background: var(--grad-primary); color: #fff; }
-    .cal-exp { font-size: .66rem; font-weight: 700; color: var(--danger); line-height: 1.3; }
-    .cal-inc { font-size: .66rem; font-weight: 700; color: var(--success); line-height: 1.3; }
+    .cal-exp { font-size: .74rem; font-weight: 700; color: var(--danger); line-height: 1.3; }
+    .cal-inc { font-size: .74rem; font-weight: 700; color: var(--success); line-height: 1.3; }
     .cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--danger); margin-top: auto; }
     .cal-legend { margin-top: 10px; font-size: .75rem; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
     /* 日次サマリーパネル */
@@ -543,6 +546,17 @@
     .cat-manage-name { flex: 1; font-size: .9rem; font-weight: 500; }
     .cat-add-row { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
     .cat-icon-input { width: 52px; text-align: center; font-size: 1.1rem; padding: 9px 4px; flex-shrink: 0; }
+
+    /* ===== ダークモードの文字色補正（基本定義より後に置いて上書きする） ===== */
+    @media (prefers-color-scheme: dark) {
+      .tx-cat-badge    { color: var(--primary-light); background: rgba(196,144,96,.16); }
+      .budget-pct.ok   { color: var(--primary-light); background: rgba(196,144,96,.16); }
+      .budget-pct.warn { color: #F2B25C; }
+      .tab-btn.active  { color: var(--primary-light); }
+      .cat-type-btn.active { color: var(--primary-light); border-color: var(--primary-light); }
+      .cat-chip:hover  { border-color: var(--primary-light); color: var(--primary-light); }
+      .edit-btn:hover  { color: var(--primary-light); }
+    }
   </style>
 </head>
 <body>
@@ -1113,7 +1127,7 @@ function renderBudget(txs, data) {
     const remainText = budget > 0
       ? ((remain >= 0 ? '残 ¥' : '超過 ¥') + Math.abs(remain).toLocaleString())
       : '';
-    const remainColor = remain < 0 ? 'color:#f87171' : 'color:var(--muted)';
+    const remainColor = remain < 0 ? 'color:var(--danger)' : 'color:var(--muted)';
     const amountText = budget > 0
       ? `¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}`
       : `¥${spent.toLocaleString()}（予算未設定）`;
@@ -1126,7 +1140,7 @@ function renderBudget(txs, data) {
         </span>
       </div>
       <div class="budget-bar-bg"><div class="budget-bar ${cls}" style="width:${pct}%"></div></div>
-      ${budget > 0 ? `<div style="font-size:.72rem;${remainColor};text-align:right">${remainText}</div>` : ''}
+      ${budget > 0 ? `<div style="font-size:.78rem;${remainColor};text-align:right">${remainText}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1149,7 +1163,12 @@ function destroyCharts() {
   if (barChart) { barChart.destroy(); barChart = null; }
 }
 
+function isDarkMode() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 function renderCharts(data) {
+  Chart.defaults.color = isDarkMode() ? '#C4A882' : '#666';
   destroyCharts(); renderPie(data); renderBar(data);
 }
 
@@ -1185,7 +1204,7 @@ function renderBar(data) {
       { label: '予算', data: incomes,  backgroundColor: 'rgba(16,185,129,.8)',  borderRadius: 6 },
       { label: '支出', data: expenses, backgroundColor: 'rgba(239,68,68,.8)',   borderRadius: 6 }
     ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' } }, x: { grid: { display: false } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } }, scales: { y: { beginAtZero: true, grid: { color: isDarkMode() ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.04)' } }, x: { grid: { display: false } } } }
   });
 }
 
