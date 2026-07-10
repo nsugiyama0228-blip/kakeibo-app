@@ -222,6 +222,7 @@
     .card-label { font-size: .78rem; opacity: .85; margin-bottom: 8px; font-weight: 500; position: relative; z-index:1; }
     .card-emoji { font-size: 1.1rem; margin-right: 4px; }
     .card-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; position: relative; z-index:1; }
+    .card-sub { font-size: .72rem; opacity: .9; margin-top: 5px; font-weight: 600; position: relative; z-index:1; }
 
     /* 通常カード */
     .card {
@@ -514,8 +515,9 @@
     }
     .cal-cell.today .cal-day-num { background: var(--grad-primary); color: #fff; }
     .cal-exp { font-size: .74rem; font-weight: 700; color: var(--danger); line-height: 1.3; }
-    .cal-inc { font-size: .74rem; font-weight: 700; color: var(--success); line-height: 1.3; }
-    .cal-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--danger); margin-top: auto; }
+    .cal-cell.cal-under { background: rgba(16,185,129,.14); }
+    .cal-cell.cal-over  { background: rgba(239,68,68,.13); }
+    .cal-cell.cal-under.today, .cal-cell.cal-over.today { box-shadow: inset 0 0 0 2px var(--primary); }
     .cal-legend { margin-top: 10px; font-size: .75rem; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
     /* 日次サマリーパネル */
     .day-summary-panel { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
@@ -628,6 +630,7 @@
     <div class="summary-card balance-card animate-fadeup" style="animation-delay:.15s">
       <div class="card-label"><span class="card-emoji">💎</span>残高</div>
       <div class="card-value" id="total-balance">¥0</div>
+      <div class="card-sub" id="daily-allowance"></div>
     </div>
   </div>
 
@@ -643,11 +646,7 @@
   <div id="tab-main">
     <div class="main-grid">
       <div class="card animate-fadeup">
-        <div class="section-title">収支を記録</div>
-        <div class="type-toggle">
-          <button class="active expense" id="btn-expense" onclick="setType('expense')">💸 支出</button>
-          <button class="income" id="btn-income" onclick="setType('income')">💰 予算</button>
-        </div>
+        <div class="section-title">💸 支出を記録</div>
         <div class="form-grid">
           <div class="form-row">
             <label>日付</label>
@@ -715,8 +714,8 @@
       <div class="cal-header" id="cal-header"></div>
       <div class="cal-grid" id="cal-grid"></div>
       <div class="cal-legend">
-        <span><span style="color:var(--danger);font-weight:700">赤</span> 支出</span>
-        <span><span style="color:var(--success);font-weight:700">緑</span> 予算</span>
+        <span><span style="color:var(--success);font-weight:700">緑の背景</span> 1日の予算ペース内</span>
+        <span><span style="color:var(--danger);font-weight:700">赤の背景</span> ペース超え</span>
       </div>
       <div class="day-summary-panel" id="day-summary-panel"></div>
     </div>
@@ -792,10 +791,6 @@
     <button class="modal-close-btn" onclick="closeModal('editTxModal')">✕</button>
     <div class="modal-title">✏️ 取引を編集</div>
     <div class="modal-scroll">
-      <div class="type-toggle">
-        <button class="active expense" id="edit-btn-expense" onclick="setEditType('expense')">💸 支出</button>
-        <button class="income" id="edit-btn-income" onclick="setEditType('income')">💰 予算</button>
-      </div>
       <div class="form-grid">
         <div class="form-row">
           <label>日付</label>
@@ -826,10 +821,6 @@
     <button class="modal-close-btn" onclick="closeModal('catModal')">✕</button>
     <div class="modal-title">🏷️ カテゴリ管理</div>
     <div class="modal-scroll">
-      <div class="cat-type-tabs">
-        <button class="cat-type-btn active" id="cat-tab-expense" onclick="switchCatTab('expense')">💸 支出</button>
-        <button class="cat-type-btn" id="cat-tab-income" onclick="switchCatTab('income')">💰 予算</button>
-      </div>
       <div id="cat-list-content"></div>
     </div>
   </div>
@@ -989,7 +980,7 @@ function logout() {
 }
 
 // ===== アプリ =====
-let currentYear, currentMonth, currentType = 'expense', selectedCatFilter = null;
+let currentYear, currentMonth, selectedCatFilter = null;
 let pieChart = null, barChart = null;
 
 function initApp() {
@@ -1011,19 +1002,10 @@ function changeMonth(d) {
   if (chartTab && chartTab.style.display !== 'none') renderCharts(getData());
 }
 
-function setType(t) {
-  currentType = t;
-  document.getElementById('btn-expense').classList.toggle('active', t === 'expense');
-  document.getElementById('btn-income').classList.toggle('active', t === 'income');
-  document.getElementById('btn-expense').classList.toggle('expense', t === 'expense');
-  document.getElementById('btn-income').classList.toggle('income', t === 'income');
-  updateCategorySelect();
-}
-
 function updateCategorySelect() {
   const sel  = document.getElementById('tx-category');
   const data = getData();
-  const cats = currentType === 'expense' ? data.categories.expense : data.categories.income;
+  const cats = data.categories.expense;
   sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
 }
 
@@ -1047,12 +1029,27 @@ function renderSummary(txs) {
   const data = getData();
   const mBudgets = getMonthBudgets(data, currentYear, currentMonth);
   const budget = (data.categories.expense || []).reduce((s, c) => s + (mBudgets[c] || 0), 0);
-  const inc = txs.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
   const exp = txs.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
   document.getElementById('total-budget').textContent  = '¥' + budget.toLocaleString();
   document.getElementById('total-expense').textContent = '¥' + exp.toLocaleString();
   const bal = budget - exp;
   document.getElementById('total-balance').textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
+
+  // 今月を表示中のときだけ「1日あたり使える額」を出す
+  const allowEl = document.getElementById('daily-allowance');
+  if (allowEl) {
+    const today = new Date();
+    const isThisMonth = today.getFullYear() === currentYear && (today.getMonth() + 1) === currentMonth;
+    if (isThisMonth && budget > 0) {
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const remainDays  = daysInMonth - today.getDate() + 1;
+      allowEl.textContent = bal > 0
+        ? `あと1日 ¥${Math.floor(bal / remainDays).toLocaleString()} 使えます`
+        : '今月の予算を使い切りました';
+    } else {
+      allowEl.textContent = '';
+    }
+  }
 }
 
 function setCatFilter(cat) {
@@ -1063,6 +1060,7 @@ function setCatFilter(cat) {
 
 function renderTxList(txs, data) {
   const el = document.getElementById('tx-list');
+  txs = txs.filter(t => t.type !== 'income');
   if (!txs.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>この月の記録はありません</div>';
     return;
@@ -1079,13 +1077,11 @@ function renderTxList(txs, data) {
     return;
   }
   const totalExp = sorted.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
-  const totalInc = sorted.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
   const summaryHtml = selectedCatFilter ? `
     <div class="cat-filter-summary">
       <span>${escHtml(data.catIcons[selectedCatFilter] || CAT_ICONS[selectedCatFilter] || '')} ${escHtml(selectedCatFilter)}の合計</span>
       <span class="cat-filter-summary-amount">
         ${totalExp > 0 ? `<span class="expense">-¥${totalExp.toLocaleString()}</span>` : ''}
-        ${totalInc > 0 ? `<span class="income">+¥${totalInc.toLocaleString()}</span>` : ''}
       </span>
     </div>` : '';
   el.innerHTML = chipsHtml + summaryHtml + sorted.map(t => `
@@ -1096,7 +1092,7 @@ function renderTxList(txs, data) {
         <span class="tx-meta">${escHtml(t.date)} · ${escHtml(data.users[t.user]?.name || t.user)}</span>
       </div>
       <div class="tx-right">
-        <span class="tx-amount ${t.type==='income'?'income':'expense'}">${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}</span>
+        <span class="tx-amount expense">-¥${t.amount.toLocaleString()}</span>
         <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
         <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')" title="削除">✕</button>
       </div>
@@ -1116,6 +1112,10 @@ function renderBudget(txs, data) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div>設定タブから予算を設定してください</div>';
     return;
   }
+  const today = new Date();
+  const isThisMonth = today.getFullYear() === currentYear && (today.getMonth() + 1) === currentMonth;
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const elapsedRatio = isThisMonth ? today.getDate() / daysInMonth : 1;
   el.innerHTML = visibleCats.map(cat => {
     const budget = mBudgets[cat] || 0;
     const spent  = expTxs.filter(t => t.category === cat).reduce((s,t) => s + t.amount, 0);
@@ -1124,6 +1124,7 @@ function renderBudget(txs, data) {
     const cls    = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
     const pctCls = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : 'ok';
     const remain = budget - spent;
+    const paceOver = isThisMonth && budget > 0 && rawPct < 100 && spent > budget * elapsedRatio;
     const remainText = budget > 0
       ? ((remain >= 0 ? '残 ¥' : '超過 ¥') + Math.abs(remain).toLocaleString())
       : '';
@@ -1136,6 +1137,7 @@ function renderBudget(txs, data) {
         <span class="budget-cat"><span class="cat-icon">${escHtml(data.catIcons[cat]||CAT_ICONS[cat]||'')}</span>${escHtml(cat)}</span>
         <span style="display:flex;align-items:center;gap:6px">
           <span class="budget-amounts">${amountText}</span>
+          ${paceOver ? '<span class="budget-pct warn">⚠️ ペース超過</span>' : ''}
           ${budget > 0 ? `<span class="budget-pct ${pctCls}">${rawPct}%</span>` : ''}
         </span>
       </div>
@@ -1188,20 +1190,21 @@ function renderPie(data) {
 }
 
 function renderBar(data) {
-  const months = [], incomes = [], expenses = [];
+  const months = [], budgets = [], expenses = [];
   for (let i = 5; i >= 0; i--) {
     let y = currentYear, m = currentMonth - i;
     while (m < 1) { m += 12; y--; }
     months.push(`${y}/${String(m).padStart(2,'0')}`);
     const txs = data.transactions.filter(t => { const d = new Date(t.date + 'T00:00:00'); return d.getFullYear()===y && (d.getMonth()+1)===m; });
-    incomes.push(txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0));
+    const mBudgets = getMonthBudgets(data, y, m);
+    budgets.push((data.categories.expense || []).reduce((s, c) => s + (mBudgets[c] || 0), 0));
     expenses.push(txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0));
   }
   const ctx = document.getElementById('bar-chart').getContext('2d');
   barChart = new Chart(ctx, {
     type: 'bar',
     data: { labels: months, datasets: [
-      { label: '予算', data: incomes,  backgroundColor: 'rgba(16,185,129,.8)',  borderRadius: 6 },
+      { label: '予算', data: budgets,  backgroundColor: 'rgba(16,185,129,.8)',  borderRadius: 6 },
       { label: '支出', data: expenses, backgroundColor: 'rgba(239,68,68,.8)',   borderRadius: 6 }
     ]},
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } }, scales: { y: { beginAtZero: true, grid: { color: isDarkMode() ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.04)' } }, x: { grid: { display: false } } } }
@@ -1219,7 +1222,7 @@ function addTransaction() {
   const newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
     ? crypto.randomUUID()
     : Date.now().toString() + '-' + Math.random().toString(36).slice(2, 10);
-  data.transactions.push({ id: newId, date, amount, category, note, type: currentType, user: currentUser });
+  data.transactions.push({ id: newId, date, amount, category, note, type: 'expense', user: currentUser });
   saveData(data);
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-note').value   = '';
@@ -1382,9 +1385,8 @@ function renderDaySummary(data) {
   const isToday = ds === todayStr();
   const label = isToday ? `今日 ${d.getMonth()+1}/${d.getDate()}（${DAY[d.getDay()]}）` : `${d.getMonth()+1}/${d.getDate()}（${DAY[d.getDay()]}）`;
 
-  const txs = data.transactions.filter(t => t.date === ds).sort((a,b) => a.type === 'income' ? -1 : 1);
-  const exp = txs.filter(t => t.type === 'expense').reduce((s,t) => s + t.amount, 0);
-  const inc = txs.filter(t => t.type === 'income').reduce((s,t) => s + t.amount, 0);
+  const txs = data.transactions.filter(t => t.date === ds && t.type === 'expense');
+  const exp = txs.reduce((s,t) => s + t.amount, 0);
 
   if (!txs.length) {
     el.innerHTML = `
@@ -1399,7 +1401,6 @@ function renderDaySummary(data) {
     <div class="day-summary-header">
       <span class="day-summary-date">${label}</span>
       <span class="day-summary-totals">
-        ${inc > 0 ? `<span style="color:var(--success)">+¥${inc.toLocaleString()}</span>` : ''}
         ${exp > 0 ? `<span style="color:var(--danger)">-¥${exp.toLocaleString()}</span>` : ''}
       </span>
     </div>
@@ -1412,8 +1413,8 @@ function renderDaySummary(data) {
             ${t.note ? `<div class="day-summary-note">${escHtml(t.note)}</div>` : ''}
           </div>
         </div>
-        <span class="day-summary-amt" style="color:${t.type==='income'?'var(--success)':'var(--danger)'}">
-          ${t.type==='income'?'+':'-'}¥${t.amount.toLocaleString()}
+        <span class="day-summary-amt" style="color:var(--danger)">
+          -¥${t.amount.toLocaleString()}
         </span>
       </div>`).join('')}`;
 }
@@ -1438,14 +1439,18 @@ function renderCalendar(data) {
   const startOffset = (firstDow - wkStart + 7) % 7;
   const daysInMonth = new Date(y, m, 0).getDate();
 
-  const dailyExp = {}, dailyInc = {};
+  const dailyExp = {};
   data.transactions
     .filter(t => { const d = new Date(t.date + 'T00:00:00'); return d.getFullYear() === y && d.getMonth() + 1 === m; })
     .forEach(t => {
+      if (t.type !== 'expense') return;
       const day = +t.date.split('-')[2];
-      if (t.type === 'expense') dailyExp[day] = (dailyExp[day] || 0) + t.amount;
-      else                      dailyInc[day] = (dailyInc[day] || 0) + t.amount;
+      dailyExp[day] = (dailyExp[day] || 0) + t.amount;
     });
+
+  const mBudgets = getMonthBudgets(data, y, m);
+  const monthBudget = (data.categories.expense || []).reduce((s, c) => s + (mBudgets[c] || 0), 0);
+  const dailyPace = monthBudget > 0 ? monthBudget / daysInMonth : 0;
 
   const today      = new Date();
   const isThisMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
@@ -1458,15 +1463,12 @@ function renderCalendar(data) {
     const isSat  = dow === 6, isSun = dow === 0;
     const isToday = isThisMonth && today.getDate() === d;
     const ds     = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const exp    = dailyExp[d] || 0, inc = dailyInc[d] || 0;
+    const exp    = dailyExp[d] || 0;
     const isSelected = ds === selectedCalDate;
-    const hasTx  = exp > 0 || inc > 0;
-    html += `<div class="cal-cell${isToday?' today':''}${isSat?' cal-sat':''}${isSun?' cal-sun':''}${isSelected?' cal-selected':''}" onclick="selectCalDay('${ds}')">
+    const paceCls = (exp > 0 && dailyPace > 0) ? (exp <= dailyPace ? ' cal-under' : ' cal-over') : '';
+    html += `<div class="cal-cell${isToday?' today':''}${isSat?' cal-sat':''}${isSun?' cal-sun':''}${isSelected?' cal-selected':''}${paceCls}" onclick="selectCalDay('${ds}')">
       <span class="cal-day-num">${d}</span>
       ${exp > 0 ? `<span class="cal-exp">${fmtK(exp)}</span>` : ''}
-      ${inc > 0 ? `<span class="cal-inc">${fmtK(inc)}</span>` : ''}
-      ${hasTx && exp === 0 ? `<span class="cal-dot" style="background:var(--success)"></span>` : ''}
-      ${hasTx && exp > 0  ? `<span class="cal-dot"></span>` : ''}
     </div>`;
   }
   document.getElementById('cal-grid').innerHTML = html;
@@ -1610,14 +1612,14 @@ function saveWeekBudget(cat, weekKey, value) {
 
 // ===== 取引編集 =====
 let editingTxId = null;
-let editTxType  = 'expense';
 
 function openEditTxModal(id) {
   const data = getData();
   const tx   = data.transactions.find(t => t.id === id);
   if (!tx) return;
   editingTxId = id;
-  setEditType(tx.type);
+  const catSel = document.getElementById('edit-tx-category');
+  catSel.innerHTML = data.categories.expense.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
   document.getElementById('edit-tx-date').value   = tx.date;
   document.getElementById('edit-tx-amount').value = tx.amount;
   document.getElementById('edit-tx-note').value   = tx.note || '';
@@ -1632,20 +1634,6 @@ function openEditTxModal(id) {
   openModal('editTxModal');
 }
 
-function setEditType(t) {
-  editTxType = t;
-  const eExp = document.getElementById('edit-btn-expense');
-  const eInc = document.getElementById('edit-btn-income');
-  eExp.classList.toggle('active',  t === 'expense');
-  eExp.classList.toggle('expense', t === 'expense');
-  eInc.classList.toggle('active',  t === 'income');
-  eInc.classList.toggle('income',  t === 'income');
-  const data = getData();
-  const sel  = document.getElementById('edit-tx-category');
-  const cats = t === 'expense' ? data.categories.expense : data.categories.income;
-  sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
-}
-
 function saveEditTx() {
   if (!editingTxId) return;
   const date     = document.getElementById('edit-tx-date').value;
@@ -1656,7 +1644,7 @@ function saveEditTx() {
   const data = getData();
   const tx   = data.transactions.find(t => t.id === editingTxId);
   if (!tx) { closeModal('editTxModal'); return; }
-  tx.date = date; tx.amount = amount; tx.category = category; tx.note = note; tx.type = editTxType;
+  tx.date = date; tx.amount = amount; tx.category = category; tx.note = note; tx.type = 'expense';
   saveData(data);
   closeModal('editTxModal');
   editingTxId = null;
@@ -1665,21 +1653,11 @@ function saveEditTx() {
 }
 
 // ===== カテゴリ管理 =====
-let currentCatTab = 'expense';
+const currentCatTab = 'expense';
 
 function openCatModal() {
-  currentCatTab = 'expense';
-  document.getElementById('cat-tab-expense').classList.add('active');
-  document.getElementById('cat-tab-income').classList.remove('active');
   renderCatList();
   openModal('catModal');
-}
-
-function switchCatTab(type) {
-  currentCatTab = type;
-  document.getElementById('cat-tab-expense').classList.toggle('active', type === 'expense');
-  document.getElementById('cat-tab-income').classList.toggle('active', type === 'income');
-  renderCatList();
 }
 
 function renderCatList() {
