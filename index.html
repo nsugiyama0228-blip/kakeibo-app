@@ -1067,7 +1067,7 @@ function renderSummary(txs) {
       const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
       const remainDays  = daysInMonth - today.getDate() + 1;
       allowEl.textContent = bal > 0
-        ? `あと1日 ¥${Math.floor(bal / remainDays).toLocaleString()} 使えます`
+        ? `1日 ¥${Math.floor(bal / remainDays).toLocaleString()} 使えます`
         : '今月の予算を使い切りました';
     } else {
       allowEl.textContent = '';
