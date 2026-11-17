@@ -737,7 +737,7 @@
       <p style="font-size:.83rem;color:var(--muted);margin-bottom:12px;line-height:1.6">iPhoneでPWAインストール後にデータが消えた場合は、Safariでアプリを開いて設定→連携コードをコピーし、PWAで連携コードを設定すると復元できます。連携が未設定の場合はJSONエクスポートで事前にバックアップをお勧めします。</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="save-btn" onclick="exportData()">📤 JSONエクスポート</button>
-        <label class="save-btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">📥 JSONインポート<input type="file" accept=".json" style="display:none" onchange="importData(event)" /></label>
+        <label class="save-btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">📥 JSONインポート<input type="file" style="display:none" onchange="importData(event)" /></label>
       </div>
       <div id="backup-msg" class="msg-area"></div>
     </div>
