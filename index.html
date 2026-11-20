@@ -614,6 +614,8 @@
     </div>
   </header>
 
+  <div id="sync-banner" onclick="onSyncBannerTap()" style="display:none;margin:8px 12px 0;padding:10px 14px;border-radius:12px;border:1.5px solid var(--danger);background:rgba(192,90,58,.12);color:var(--danger);font-size:.9rem;font-weight:700;line-height:1.5;cursor:pointer"></div>
+
   <div class="month-nav">
     <button onclick="changeMonth(-1)">◀</button>
     <span id="month-label" onclick="goToCurrentMonth()" title="タップで今月に戻る"></span>
@@ -972,6 +974,7 @@ async function verifyPin() {
     document.getElementById('app').style.display = 'block';
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
     initApp();
+    updateSyncBanner('idle');
     syncAndRender();
     startSyncPolling();
   } else {
@@ -1724,6 +1727,32 @@ function setSyncStatus(s, msg) {
   const map = { idle:'', syncing:'🔄', ok:'☁️', error:'⚠️' };
   el.textContent = map[s] ?? '';
   el.title = msg || (s === 'ok' ? '同期済み' : s === 'error' ? '同期エラー' : s === 'syncing' ? '同期中...' : '');
+  updateSyncBanner(s, msg);
+}
+
+// 同期が切れている・失敗している時に、画面の上に目立つお知らせを出す
+let syncBannerMode = '';
+function updateSyncBanner(s, msg) {
+  const b = document.getElementById('sync-banner');
+  if (!b) return;
+  const cfg = getSyncConfig();
+  if (!cfg.token || !cfg.gistId) {
+    syncBannerMode = 'unset';
+    b.innerHTML = '⚠️ 同期がつながっていません<br><span style="font-weight:500;font-size:.82rem">記録はこのスマホの中だけです。タップしてつなぎ直す</span>';
+    b.style.display = '';
+  } else if (s === 'error') {
+    syncBannerMode = 'error';
+    b.innerHTML = '⚠️ 同期できていません<br><span style="font-weight:500;font-size:.82rem">' + escHtml(msg || '同期エラー') + '（タップで設定を開く）</span>';
+    b.style.display = '';
+  } else if (s === 'ok') {
+    syncBannerMode = '';
+    b.style.display = 'none';
+  }
+}
+function onSyncBannerTap() {
+  showTab('tab-settings');
+  const sec = document.getElementById('sync-settings-content');
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 let pushTimer = null;
@@ -2041,9 +2070,10 @@ function importData(event) {
       if (!confirm(`取引 ${imported.transactions.length} 件のデータをインポートします。\n現在のデータにマージされます。よろしいですか？`)) return;
       mergeRemoteData(imported);
       renderAll();
-      schedulePush();
+      schedulePush(); // 同期がつながっていれば、取り込んだ分を相手にも送る
+      const cfg = getSyncConfig();
       const msg = document.getElementById('backup-msg');
-      if (msg) { msg.className = 'msg-area text-success'; msg.textContent = 'インポートが完了しました'; }
+      if (msg) { msg.className = 'msg-area text-success'; msg.textContent = (cfg.token && cfg.gistId) ? 'インポートが完了しました（相手にも送ります）' : 'インポートが完了しました（同期がつながっていないので、このスマホだけに入りました）'; }
     } catch(err) {
       alert('ファイルの読み込みに失敗しました');
     }
