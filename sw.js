@@ -1,8 +1,7 @@
-const CACHE = 'kakeibo-v11';
+const CACHE = 'kakeibo-v13';
 const ASSETS = [
   './',
   './index.html',
-  './chart.umd.js',
   './manifest.json',
   './icon.png',
   './icon-512.svg',
