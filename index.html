@@ -15,7 +15,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-  <script src="chart.umd.js"></script>
   <style>
     :root {
       --primary:       #8B5228;
@@ -406,7 +405,6 @@
     .budget-pct.over { background: rgba(239,68,68,.1);  color: var(--danger); }
 
     /* チャート */
-    .chart-wrap { position: relative; height: 230px; }
 
     .empty {
       color: var(--muted); font-size: .9rem; text-align: center;
@@ -642,7 +640,6 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="showTab('tab-main')" title="記録">📝<span class="tab-text"> 記録</span></button>
     <button class="tab-btn" onclick="showTab('tab-budget')" title="予算">🎯<span class="tab-text"> 予算</span></button>
-    <button class="tab-btn" onclick="showTab('tab-chart')" title="グラフ">📊<span class="tab-text"> グラフ</span></button>
     <button class="tab-btn" onclick="showTab('tab-calendar')" title="カレンダー">📅<span class="tab-text"> カレンダー</span></button>
     <button class="tab-btn" onclick="showTab('tab-settings')" title="設定">⚙️<span class="tab-text"> 設定</span></button>
   </div>
@@ -694,20 +691,6 @@
           <select id="weekly-cat-select" onchange="renderWeeklyBreakdown()" style="font-size:.82rem;padding:5px 8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit"></select>
         </div>
         <div id="weekly-breakdown-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- グラフタブ -->
-  <div id="tab-chart" style="display:none">
-    <div class="main-grid">
-      <div class="card">
-        <div class="section-title">支出内訳</div>
-        <div class="chart-wrap"><canvas id="pie-chart"></canvas></div>
-      </div>
-      <div class="card">
-        <div class="section-title">月別推移</div>
-        <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
       </div>
     </div>
   </div>
@@ -1017,13 +1000,11 @@ function logout() {
   document.getElementById('pin-error').textContent = '';
   document.getElementById('pin-screen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
-  destroyCharts();
   stopSyncPolling();
 }
 
 // ===== アプリ =====
 let currentYear, currentMonth, selectedCatFilter = null;
-let pieChart = null, barChart = null;
 
 function initApp() {
   const now = new Date();
@@ -1047,8 +1028,6 @@ function changeMonth(d) {
   renderAll();
   const calTab = document.getElementById('tab-calendar');
   if (calTab && calTab.style.display !== 'none') renderCalendarTab(getData());
-  const chartTab = document.getElementById('tab-chart');
-  if (chartTab && chartTab.style.display !== 'none') renderCharts(getData());
 }
 
 function updateCategorySelect() {
@@ -1212,58 +1191,6 @@ function renderBudgetSettings(data) {
     </div>`).join('');
 }
 
-// ===== チャート =====
-function destroyCharts() {
-  if (pieChart) { pieChart.destroy(); pieChart = null; }
-  if (barChart) { barChart.destroy(); barChart = null; }
-}
-
-function isDarkMode() {
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-function renderCharts(data) {
-  Chart.defaults.color = isDarkMode() ? '#C4A882' : '#666';
-  destroyCharts(); renderPie(data); renderBar(data);
-}
-
-function renderPie(data) {
-  const txs = monthlyTxs(data).filter(t => t.type === 'expense');
-  const map = {};
-  txs.forEach(t => { map[t.category] = (map[t.category] || 0) + t.amount; });
-  const labels = Object.keys(map);
-  const values = Object.values(map);
-  const colors = ['#8B5228','#C8923A','#C05A3A','#5C8840','#4E8E8B','#7A5C9E','#C87848','#8FA85C','#A85870','#9B8568'];
-  const ctx = document.getElementById('pie-chart').getContext('2d');
-  pieChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } } }
-  });
-}
-
-function renderBar(data) {
-  const months = [], budgets = [], expenses = [];
-  for (let i = 5; i >= 0; i--) {
-    let y = currentYear, m = currentMonth - i;
-    while (m < 1) { m += 12; y--; }
-    months.push(`${y}/${String(m).padStart(2,'0')}`);
-    const txs = data.transactions.filter(t => { const d = new Date(t.date + 'T00:00:00'); return d.getFullYear()===y && (d.getMonth()+1)===m; });
-    const mBudgets = getMonthBudgets(data, y, m);
-    budgets.push((data.categories.expense || []).reduce((s, c) => s + (mBudgets[c] || 0), 0));
-    expenses.push(txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0));
-  }
-  const ctx = document.getElementById('bar-chart').getContext('2d');
-  barChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: months, datasets: [
-      { label: '予算', data: budgets,  backgroundColor: 'rgba(92,136,64,.8)',  borderRadius: 6 },
-      { label: '支出', data: expenses, backgroundColor: 'rgba(192,90,58,.85)', borderRadius: 6 }
-    ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 11, family: 'Inter' }, padding: 12, usePointStyle: true } } }, scales: { y: { beginAtZero: true, grid: { color: isDarkMode() ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.04)' } }, x: { grid: { display: false } } } }
-  });
-}
-
 // ===== 操作 =====
 function addTransaction() {
   const date     = document.getElementById('tx-date').value;
@@ -1322,10 +1249,9 @@ function saveBudgets() {
 
 
 function showTab(id) {
-  const TABS = ['tab-main','tab-budget','tab-chart','tab-calendar','tab-settings'];
+  const TABS = ['tab-main','tab-budget','tab-calendar','tab-settings'];
   TABS.forEach(t => document.getElementById(t).style.display = t === id ? '' : 'none');
   document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', TABS[i] === id));
-  if (id === 'tab-chart') renderCharts(getData());
   if (id === 'tab-calendar') renderCalendarTab(getData());
   if (id === 'tab-settings') {
     renderSyncSettings();
