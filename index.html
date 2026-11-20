@@ -882,9 +882,7 @@ async function sha256(str) {
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function getData() {
-  let d = null;
-  try { d = JSON.parse(localStorage.getItem('kakeibo_data')); } catch(e) {}
+function normalizeData(d) {
   if (!d || typeof d !== 'object') d = {};
   if (!d.users || typeof d.users !== 'object') d.users = {};
   if (!d.users.user1 || typeof d.users.user1 !== 'object') d.users.user1 = {};
@@ -912,9 +910,42 @@ function getData() {
   if (!d.catIcons || typeof d.catIcons !== 'object') d.catIcons = Object.assign({}, CAT_ICONS);
   if (!d.weekBudgetOverrides || typeof d.weekBudgetOverrides !== 'object') d.weekBudgetOverrides = {};
   if (!('customWeekStarts' in d)) d.customWeekStarts = null;
+  if (!d.fieldTs || typeof d.fieldTs !== 'object') d.fieldTs = {};
   return d;
 }
-function saveData(d) { localStorage.setItem('kakeibo_data', JSON.stringify(d)); }
+function getData() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem('kakeibo_data')); } catch(e) {}
+  return normalizeData(d);
+}
+
+// 同期対象の設定項目（項目ごとに最終更新時刻を持ち、新しい方を採用する）
+const SYNC_FIELDS = ['budgets', 'categories', 'catIcons', 'weekStart', 'customWeekStarts', 'weekBudgetOverrides'];
+
+function txBody(t) {
+  const { updatedAt, ...rest } = t;
+  return JSON.stringify(rest);
+}
+
+// 端末上の変更を保存。変更された設定項目・取引には更新時刻を付ける
+// （同期で取り込んだデータを保存するときは fromSync: true で時刻を付けない）
+function saveData(d, opts) {
+  if (!(opts && opts.fromSync)) {
+    let prev = null;
+    try { prev = JSON.parse(localStorage.getItem('kakeibo_data')); } catch(e) {}
+    prev = normalizeData(prev);
+    const now = Date.now();
+    if (!d.fieldTs || typeof d.fieldTs !== 'object') d.fieldTs = {};
+    SYNC_FIELDS.forEach(f => {
+      if (JSON.stringify(d[f] ?? null) !== JSON.stringify(prev[f] ?? null)) d.fieldTs[f] = now;
+    });
+    const prevTx = new Map(prev.transactions.map(t => [t.id, txBody(t)]));
+    (d.transactions || []).forEach(t => {
+      if (prevTx.get(t.id) !== txBody(t)) t.updatedAt = now;
+    });
+  }
+  localStorage.setItem('kakeibo_data', JSON.stringify(d));
+}
 
 // ===== PIN認証 =====
 let currentUser = 'user1';
@@ -958,7 +989,7 @@ async function verifyPin() {
     document.getElementById('app').style.display = 'block';
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
     initApp();
-    pullFromGist().then(pulled => { if (pulled) renderAll(); });
+    syncAndRender();
     startSyncPolling();
   } else {
     const errEl = document.getElementById('pin-error');
@@ -973,9 +1004,7 @@ async function verifyPin() {
 let syncPollTimer = null;
 function startSyncPolling() {
   if (syncPollTimer) clearInterval(syncPollTimer);
-  syncPollTimer = setInterval(() => {
-    pullFromGist().then(pulled => { if (pulled) renderAll(); });
-  }, 60000);
+  syncPollTimer = setInterval(() => { syncAndRender(); }, 30000);
 }
 function stopSyncPolling() {
   if (syncPollTimer) { clearInterval(syncPollTimer); syncPollTimer = null; }
@@ -1777,93 +1806,173 @@ function schedulePush() {
   if (!cfg.token || !cfg.gistId) return;
   if (pushTimer) clearTimeout(pushTimer);
   setSyncStatus('syncing');
-  pushTimer = setTimeout(async () => {
+  pushTimer = setTimeout(() => {
     pushTimer = null;
-    // 自分の変更は確実に送信する（pullで上書きされないように）
-    // 相手の変更は60秒ごとのポーリングで取り込む
-    await pushToGist();
+    syncAndRender();
   }, 1500);
 }
 
-async function pushToGist() {
-  const cfg = getSyncConfig();
-  if (!cfg.token || !cfg.gistId) return;
-  if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
-  setSyncStatus('syncing');
-  const data = getData();
-  const payload = { transactions: data.transactions, budgets: data.budgets, deletedIds: data.deletedIds, categories: data.categories, catIcons: data.catIcons, weekStart: data.weekStart, weekBudgetOverrides: data.weekBudgetOverrides, customWeekStarts: data.customWeekStarts ?? null };
-  try {
-    const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
-      method: 'PATCH',
-      headers: { 'Authorization': `Bearer ${cfg.token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
-      body: JSON.stringify({ files: { 'kakeibo_data.json': { content: JSON.stringify(payload) } } })
-    });
-    if (r.ok) {
-      cfg.lastSync = new Date().toISOString(); saveSyncConfig(cfg);
-      setSyncStatus('ok');
-    } else {
-      const reason = r.status === 401 ? 'アップロードエラー: 認証エラー（トークン期限切れの可能性）'
-                   : r.status === 404 ? 'アップロードエラー: Gistが見つかりません（連携コード違い or 削除済み）'
-                   : r.status === 403 ? 'アップロードエラー: アクセス権限エラー（トークンのgist権限なし）'
-                   : `アップロードエラー (${r.status})`;
-      setSyncStatus('error', reason);
-    }
-  } catch(e) { setSyncStatus('error', 'ネットワークエラー'); }
+const GIST_FILE = 'kakeibo_data.json';
+
+function syncPayload(d) {
+  return {
+    transactions: d.transactions, budgets: d.budgets, deletedIds: d.deletedIds,
+    categories: d.categories, catIcons: d.catIcons, weekStart: d.weekStart,
+    weekBudgetOverrides: d.weekBudgetOverrides, customWeekStarts: d.customWeekStarts ?? null,
+    fieldTs: d.fieldTs || {}
+  };
 }
 
-async function pullFromGist() {
+// キー順に依存しない比較用の文字列化
+function stableStringify(v) {
+  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().filter(k => v[k] !== undefined)
+      .map(k => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v ?? null);
+}
+function canonicalPayload(p) {
+  const c = Object.assign({}, p);
+  c.transactions = [...(c.transactions || [])].sort((x, y) => String(x.id) < String(y.id) ? -1 : String(x.id) > String(y.id) ? 1 : 0);
+  c.deletedIds = [...new Set(c.deletedIds || [])].map(String).sort();
+  return stableStringify(c);
+}
+
+function syncErrorReason(status, phase) {
+  return status === 401 ? `${phase}エラー: 認証エラー（トークン期限切れの可能性）`
+       : status === 404 ? `${phase}エラー: Gistが見つかりません（連携コード違い or 削除済み）`
+       : status === 403 ? `${phase}エラー: アクセス権限エラー（トークンのgist権限なし）`
+       : `${phase}エラー (${status})`;
+}
+
+// クラウドの最新データを取り込み → 統合 → 差分があればアップロード
+// 必ずこの順で行うので、相手の入力を上書きで消すことがない
+async function doSync() {
   const cfg = getSyncConfig();
-  if (!cfg.token || !cfg.gistId) return false;
+  if (!cfg.token || !cfg.gistId) return { ok: false, changed: false };
   setSyncStatus('syncing');
+  const url = `https://api.github.com/gists/${cfg.gistId}`;
+  const headers = { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github+json' };
+  let changed = false;
   try {
-    const r = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
-      headers: { 'Authorization': `Bearer ${cfg.token}`, 'Accept': 'application/vnd.github+json' }
-    });
-    if (!r.ok) {
-      const reason = r.status === 401 ? '取得エラー: 認証エラー（トークン期限切れの可能性）'
-                   : r.status === 404 ? '取得エラー: Gistが見つかりません（連携コード違い or 削除済み）'
-                   : r.status === 403 ? '取得エラー: アクセス権限エラー（トークンのgist権限なし）'
-                   : `取得エラー (${r.status})`;
-      setSyncStatus('error', reason);
-      return false;
-    }
+    const r = await fetch(url, { headers, cache: 'no-store' });
+    if (!r.ok) { setSyncStatus('error', syncErrorReason(r.status, '取得')); return { ok: false, changed }; }
     const gist = await r.json();
-    const content = gist.files['kakeibo_data.json']?.content;
-    if (!content) { setSyncStatus('ok'); return false; }
-    mergeRemoteData(JSON.parse(content));
-    cfg.lastSync = new Date().toISOString(); saveSyncConfig(cfg);
+    const file = gist.files && gist.files[GIST_FILE];
+    let remote = null;
+    if (file) {
+      let content = file.content;
+      if (file.truncated && file.raw_url) {
+        const rr = await fetch(file.raw_url, { cache: 'no-store' });
+        if (!rr.ok) { setSyncStatus('error', syncErrorReason(rr.status, '取得')); return { ok: false, changed }; }
+        content = await rr.text();
+      }
+      if (content) remote = JSON.parse(content);
+    }
+    if (remote && typeof remote === 'object') changed = mergeRemoteData(remote);
+
+    const payload = syncPayload(getData());
+    const remoteCanon = (remote && typeof remote === 'object') ? canonicalPayload(syncPayload(normalizeData(JSON.parse(JSON.stringify(remote))))) : null;
+    if (canonicalPayload(payload) !== remoteCanon) {
+      const pr = await fetch(url, {
+        method: 'PATCH',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, headers),
+        body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload) } } })
+      });
+      if (!pr.ok) { setSyncStatus('error', syncErrorReason(pr.status, 'アップロード')); return { ok: false, changed }; }
+    }
+    const c = getSyncConfig();
+    if (c.gistId === cfg.gistId) { c.lastSync = new Date().toISOString(); saveSyncConfig(c); }
     setSyncStatus('ok');
-    return true;
-  } catch(e) { setSyncStatus('error', 'ネットワークエラー'); return false; }
+    return { ok: true, changed };
+  } catch(e) {
+    setSyncStatus('error', e instanceof SyntaxError ? '取得エラー: クラウドのデータ形式が不正です' : 'ネットワークエラー');
+    return { ok: false, changed };
+  }
 }
 
+// 同期を直列化（同時に走らせない。実行中に要求が来たら終了後にもう一度実行）
+let syncInFlight = null, syncAgain = false;
+function syncNow() {
+  if (syncInFlight) { syncAgain = true; return syncInFlight; }
+  syncInFlight = (async () => {
+    let res = { ok: false, changed: false }, anyChanged = false;
+    try {
+      do {
+        syncAgain = false;
+        res = await doSync();
+        anyChanged = anyChanged || res.changed;
+      } while (syncAgain);
+    } finally {
+      syncInFlight = null;
+    }
+    return { ok: res.ok, changed: anyChanged };
+  })();
+  return syncInFlight;
+}
+
+function isAppVisible() {
+  const app = document.getElementById('app');
+  return !!(app && app.style.display !== 'none' && currentYear);
+}
+
+async function syncAndRender() {
+  const res = await syncNow();
+  if (res.changed && isAppVisible()) renderAll();
+  return res;
+}
+
+// アプリに戻ってきたらすぐ同期、閉じる/裏に回るときは未送信分をすぐ送る
+document.addEventListener('visibilitychange', () => {
+  if (!getSyncConfig().gistId) return;
+  if (document.visibilityState === 'hidden') {
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; syncNow(); }
+  } else if (isAppVisible()) {
+    syncAndRender();
+  }
+});
+window.addEventListener('online', () => { if (isAppVisible()) syncAndRender(); });
+
+function isValidSyncField(f, v) {
+  switch (f) {
+    case 'weekStart': return typeof v === 'number' && v >= 0 && v <= 6;
+    case 'customWeekStarts': return v === null || Array.isArray(v);
+    default: return !!v && typeof v === 'object' && !Array.isArray(v);
+  }
+}
+
+// クラウド（またはインポート）のデータを端末のデータに統合する
+// 取引: 両方の和集合。同じ取引は更新時刻が新しい方を採用。削除済みIDは除外
+// 設定: 項目ごとに更新時刻が新しい方を採用
+// 戻り値: 端末のデータが変わったら true
 function mergeRemoteData(remote) {
   const local = getData();
-  const deletedSet = new Set([...(local.deletedIds || []), ...(remote.deletedIds || [])]);
-  const txMap = {};
-  [...(remote.transactions || []), ...(local.transactions || [])].forEach(t => { txMap[t.id] = t; });
-  deletedSet.forEach(id => delete txMap[id]);
-  local.transactions = Object.values(txMap);
+  const before = canonicalPayload(syncPayload(local));
+
+  const deletedSet = new Set([...(local.deletedIds || []), ...(Array.isArray(remote.deletedIds) ? remote.deletedIds : [])]);
+  const txMap = new Map();
+  (local.transactions || []).forEach(t => { if (t && t.id != null) txMap.set(t.id, t); });
+  (Array.isArray(remote.transactions) ? remote.transactions : []).forEach(rt => {
+    if (!rt || rt.id == null) return;
+    const lt = txMap.get(rt.id);
+    // 同時刻なら相手側を採用（端末間で結果を一致させるため）
+    if (!lt || (rt.updatedAt || 0) >= (lt.updatedAt || 0)) txMap.set(rt.id, rt);
+  });
+  deletedSet.forEach(id => txMap.delete(id));
+  local.transactions = [...txMap.values()];
   local.deletedIds = [...deletedSet];
-  if (remote.budgets && typeof remote.budgets === 'object') local.budgets = remote.budgets;
-  if (remote.categories && typeof remote.categories === 'object') local.categories = remote.categories;
-  if (remote.catIcons && typeof remote.catIcons === 'object') local.catIcons = remote.catIcons;
-  if (typeof remote.weekStart === 'number' && remote.weekStart >= 0 && remote.weekStart <= 6) local.weekStart = remote.weekStart;
-  if ('customWeekStarts' in remote) local.customWeekStarts = remote.customWeekStarts;
-  if (remote.weekBudgetOverrides && typeof remote.weekBudgetOverrides === 'object') {
-    if (!local.weekBudgetOverrides || typeof local.weekBudgetOverrides !== 'object') {
-      local.weekBudgetOverrides = remote.weekBudgetOverrides;
-    } else {
-      for (const cat of Object.keys(remote.weekBudgetOverrides)) {
-        if (!local.weekBudgetOverrides[cat]) {
-          local.weekBudgetOverrides[cat] = remote.weekBudgetOverrides[cat];
-        } else {
-          local.weekBudgetOverrides[cat] = { ...remote.weekBudgetOverrides[cat], ...local.weekBudgetOverrides[cat] };
-        }
-      }
-    }
-  }
-  saveData(local);
+
+  const rts = (remote.fieldTs && typeof remote.fieldTs === 'object') ? remote.fieldTs : {};
+  SYNC_FIELDS.forEach(f => {
+    if (!(f in remote) || !isValidSyncField(f, remote[f])) return;
+    const rt = rts[f] || 0, lt = local.fieldTs[f] || 0;
+    if (rt >= lt) { local[f] = remote[f]; local.fieldTs[f] = rt; }
+  });
+
+  const merged = normalizeData(local);
+  saveData(merged, { fromSync: true });
+  return canonicalPayload(syncPayload(merged)) !== before;
 }
 
 function setupSyncFromHash() {
@@ -1945,9 +2054,7 @@ async function setupSync() {
   if (parts.length !== 2 || !parts[0] || !parts[1]) { msg.className = 'msg-area text-danger'; msg.textContent = '連携コードの形式が正しくありません'; return; }
   saveSyncConfig({ gistId: parts[0], token: parts[1] });
   msg.className = 'msg-area text-success'; msg.textContent = '連携中...';
-  const ok = await pullFromGist();
-  if (ok) renderAll();
-  await pushToGist();
+  await syncAndRender();
   renderSyncSettings();
 }
 
@@ -1959,13 +2066,8 @@ async function updateTokenOnly() {
   const trimmed = newToken.trim();
   if (!trimmed) { alert('トークンが空です'); return; }
   saveSyncConfig({ gistId: cfg.gistId, token: trimmed });
-  setSyncStatus('syncing');
-  const ok = await pullFromGist();
-  if (ok) {
-    renderAll();
-    await pushToGist();
-    alert('トークンを更新しました。同期が再開されます。');
-  }
+  const res = await syncAndRender();
+  if (res.ok) alert('トークンを更新しました。同期が再開されます。');
   renderSyncSettings();
 }
 
@@ -1977,10 +2079,12 @@ function disconnectSync() {
 }
 
 async function manualSync() {
-  const ok = await pullFromGist();
-  if (ok) renderAll();
-  await pushToGist();
+  const res = await syncAndRender();
   renderSyncSettings();
+  if (!res.ok && getSyncConfig().gistId) {
+    const st = document.getElementById('sync-status');
+    alert('同期できませんでした\n' + ((st && st.title) || ''));
+  }
 }
 
 // ===== エクスポート / インポート =====
@@ -2011,6 +2115,7 @@ function importData(event) {
       if (!confirm(`取引 ${imported.transactions.length} 件のデータをインポートします。\n現在のデータにマージされます。よろしいですか？`)) return;
       mergeRemoteData(imported);
       renderAll();
+      schedulePush();
       const msg = document.getElementById('backup-msg');
       if (msg) { msg.className = 'msg-area text-success'; msg.textContent = 'インポートが完了しました'; }
     } catch(err) {
