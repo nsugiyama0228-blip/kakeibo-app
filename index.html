@@ -227,6 +227,32 @@
     .card-value { font-size: 1.5rem; font-weight: 800; letter-spacing: -.03em; position: relative; z-index:1; }
     .card-sub { font-size: .72rem; opacity: .9; margin-top: 5px; font-weight: 600; position: relative; z-index:1; }
 
+    /* 今月のまとめ（1枚） */
+    .summary-compact { margin-bottom: 16px; padding: 14px 16px; }
+    .sum-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .sum-item { min-width: 0; }
+    .sum-item + .sum-item { border-left: 1px solid var(--border); padding-left: 10px; }
+    .sum-label { font-size: .72rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; white-space: nowrap; }
+    .sum-value { font-size: clamp(.95rem, 4.5vw, 1.25rem); font-weight: 800; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sum-expense { color: var(--text); }
+    .sum-balance { color: var(--primary); }
+    .sum-balance.minus { color: var(--danger); }
+    .sum-bar-bg { height: 8px; background: var(--bg); border-radius: 99px; overflow: hidden; margin-top: 12px; box-shadow: inset 0 1px 2px rgba(0,0,0,.06); }
+    .sum-bar { height: 100%; width: 0; border-radius: 99px; background: var(--grad-primary); transition: width .5s ease; }
+    .sum-bar.warn { background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%); }
+    .sum-bar.over { background: linear-gradient(90deg, var(--danger) 0%, #f97316 100%); }
+    .sum-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 6px; font-size: .75rem; color: var(--muted); font-weight: 600; }
+    #daily-allowance { color: var(--text); font-weight: 700; text-align: right; }
+
+    /* 記録欄のカテゴリボタン */
+    .cat-pick { display: flex; flex-wrap: wrap; gap: 5px; }
+    .cat-pick-btn {
+      border: 1.5px solid var(--border); background: var(--bg); color: var(--text);
+      border-radius: 99px; padding: 8px 11px; font-size: .8rem; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
+    }
+    .cat-pick-btn.active { background: var(--grad-primary); color: #fff; border-color: transparent; box-shadow: var(--glow-primary); }
+
     /* 通常カード */
     .card {
       background: var(--card); border-radius: var(--radius);
@@ -239,9 +265,9 @@
       .main-grid { grid-template-columns: 1fr; }
       #app { padding-bottom: 90px; }
 
-      /* 収支記録フォームを1列に */
-      .form-grid { grid-template-columns: 1fr; }
-      .form-full { grid-column: 1; }
+      /* 記録フォーム：日付と金額は横並び、カテゴリとメモは1行まるごと */
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .form-full { grid-column: 1 / -1; }
 
       /* ユーザー設定モーダルのPIN入力行を折り返し */
       .user-setting-row { flex-wrap: wrap; }
@@ -348,33 +374,43 @@
       background: rgba(139,82,40,.08); font-size: .85rem; font-weight: 600; color: var(--text);
     }
     .cat-filter-summary-amount { display: flex; gap: 10px; }
+    .tx-list { overflow-x: hidden; }
     .tx-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 6px; border-bottom: 1px solid var(--border);
-      transition: background .15s; border-radius: 8px; margin: 0 -6px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 11px 4px; border-bottom: 1px solid var(--border);
+      transition: background .15s;
+    }
+    /* スマホでは一覧の中だけスクロールさせず、画面ごと流れるようにする */
+    @media (max-width: 640px) {
+      .tx-list { max-height: none; overflow-y: visible; }
+      .cat-filter-chips { position: static; }
     }
     .tx-item:hover { background: var(--bg); }
     .tx-item:last-child { border-bottom: none; }
-    .tx-left { display: flex; flex-direction: column; gap: 2px; }
+    .tx-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
     .tx-cat-badge {
       display: inline-flex; align-items: center; gap: 4px; font-size: .75rem;
       background: rgba(139,82,40,.1); color: var(--primary); border-radius: 99px;
       padding: 2px 8px; font-weight: 600; width: fit-content; margin-bottom: 1px;
     }
-    .tx-note { font-size: .9rem; font-weight: 500; }
-    .tx-meta { font-size: .75rem; color: var(--muted); }
-    .tx-right { display: flex; align-items: center; gap: 8px; }
-    .tx-amount { font-weight: 700; font-size: 1rem; }
+    .tx-note { font-size: .9rem; font-weight: 500; overflow-wrap: anywhere; }
+    .tx-meta { font-size: .75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 誰が記録したかの色（夫婦で色を分ける） */
+    .who-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+    .who-dot.user1 { background: #4F86B8; }
+    .who-dot.user2 { background: #D0708C; }
+    .tx-right { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+    .tx-amount { font-weight: 700; font-size: 1rem; text-align: right; margin-right: 4px; white-space: nowrap; }
     .tx-amount.income  { color: var(--success); }
-    .tx-amount.expense { color: var(--danger); }
+    .tx-amount.expense { color: var(--text); }
     .del-btn {
       background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: 1.05rem; padding: 10px 12px; border-radius: 8px; transition: all .15s;
+      font-size: 1.05rem; padding: 9px 9px; border-radius: 8px; transition: all .15s;
     }
     .del-btn:hover { background: rgba(239,68,68,.1); color: var(--danger); }
     .edit-btn {
       background: none; border: none; color: var(--muted); cursor: pointer;
-      font-size: 1.05rem; padding: 10px 12px; border-radius: 8px; transition: all .15s;
+      font-size: 1.05rem; padding: 9px 9px; border-radius: 8px; transition: all .15s;
     }
     .edit-btn:hover { background: rgba(139,82,40,.1); color: var(--primary); }
 
@@ -516,7 +552,7 @@
       color: var(--text);
     }
     .cal-cell.today .cal-day-num { background: var(--grad-primary); color: #fff; }
-    .cal-exp { font-size: .74rem; font-weight: 700; color: var(--danger); line-height: 1.3; }
+    .cal-exp { font-size: .74rem; font-weight: 700; color: var(--text); line-height: 1.3; }
     .cal-cell.cal-under { background: rgba(16,185,129,.14); }
     .cal-cell.cal-over  { background: rgba(239,68,68,.13); }
     .cal-cell.cal-under.today, .cal-cell.cal-over.today { box-shadow: inset 0 0 0 2px var(--primary); }
@@ -560,6 +596,7 @@
       .cat-type-btn.active { color: var(--primary-light); border-color: var(--primary-light); }
       .cat-chip:hover  { border-color: var(--primary-light); color: var(--primary-light); }
       .edit-btn:hover  { color: var(--primary-light); }
+      .sum-balance:not(.minus) { color: var(--primary-light); }
     }
   </style>
 </head>
@@ -623,20 +660,15 @@
     <button id="today-btn" class="today-btn" onclick="goToCurrentMonth()" style="display:none">今月へ</button>
   </div>
 
-  <div class="summary-cards">
-    <div class="summary-card income-card animate-fadeup" style="animation-delay:.05s">
-      <div class="card-label"><span class="card-emoji">🎯</span>予算</div>
-      <div class="card-value" id="total-budget">¥0</div>
+  <!-- 今月のまとめ（1枚にまとめて、記録欄が最初の画面に入るようにする） -->
+  <div class="card summary-compact animate-fadeup">
+    <div class="sum-row">
+      <div class="sum-item"><div class="sum-label">🎯 予算</div><div class="sum-value" id="total-budget">¥0</div></div>
+      <div class="sum-item"><div class="sum-label">📉 支出</div><div class="sum-value sum-expense" id="total-expense">¥0</div></div>
+      <div class="sum-item"><div class="sum-label">💎 残高</div><div class="sum-value sum-balance" id="total-balance">¥0</div></div>
     </div>
-    <div class="summary-card expense-card animate-fadeup" style="animation-delay:.1s">
-      <div class="card-label"><span class="card-emoji">📉</span>支出</div>
-      <div class="card-value" id="total-expense">¥0</div>
-    </div>
-    <div class="summary-card balance-card animate-fadeup" style="animation-delay:.15s">
-      <div class="card-label"><span class="card-emoji">💎</span>残高</div>
-      <div class="card-value" id="total-balance">¥0</div>
-      <div class="card-sub" id="daily-allowance"></div>
-    </div>
+    <div class="sum-bar-bg"><div class="sum-bar" id="summary-bar"></div></div>
+    <div class="sum-foot"><span id="summary-pct"></span><span id="daily-allowance"></span></div>
   </div>
 
   <div class="tabs">
@@ -654,22 +686,23 @@
         <div class="form-grid">
           <div class="form-row">
             <label>日付</label>
-            <input type="date" id="tx-date" />
+            <input type="date" id="tx-date" onchange="onTxDateChange()" />
           </div>
           <div class="form-row">
             <label>金額 (円)</label>
-            <input type="number" id="tx-amount" placeholder="例: 1500" min="0" />
+            <input type="number" id="tx-amount" placeholder="例: 1500" min="0" inputmode="numeric" />
           </div>
-          <div class="form-row">
-            <label>カテゴリ</label>
-            <select id="tx-category"></select>
+          <div class="form-row form-full">
+            <label>カテゴリ（よく使う順）</label>
+            <div class="cat-pick" id="tx-cat-chips"></div>
+            <select id="tx-category" style="display:none" aria-hidden="true"></select>
           </div>
-          <div class="form-row">
+          <div class="form-row form-full">
             <label>メモ</label>
             <input type="text" id="tx-note" placeholder="メモ（任意）" />
           </div>
         </div>
-        <button class="submit-btn" onclick="addTransaction()">追加する</button>
+        <button class="submit-btn" id="tx-submit-btn" onclick="addTransaction()">追加する</button>
       </div>
 
       <div class="card animate-fadeup" style="animation-delay:.05s">
@@ -973,6 +1006,8 @@ async function verifyPin() {
     document.getElementById('pin-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     document.getElementById('current-user-label').textContent = data.users[currentUser].name;
+    try { localStorage.setItem(LAST_USER_KEY, currentUser); } catch(e) {}
+    requestPersistentStorage();
     initApp();
     updateSyncBanner('idle');
     syncAndRender();
@@ -987,10 +1022,37 @@ async function verifyPin() {
   }
 }
 
+// このスマホで前回ログインした人を覚えておき、次回はその人を選んだ状態で開く
+const LAST_USER_KEY = 'kakeibo_last_user';
+function refreshUserButtons() {
+  const data = getData();
+  ['user1', 'user2'].forEach(uid => {
+    const btn = document.getElementById('btn-' + uid);
+    if (btn) btn.textContent = '👤 ' + data.users[uid].name;
+  });
+}
+function restoreLastUser() {
+  refreshUserButtons();
+  let u = null;
+  try { u = localStorage.getItem(LAST_USER_KEY); } catch(e) {}
+  if (u === 'user1' || u === 'user2') selectUser(u);
+}
+
+// スマホの空き容量が減ってもブラウザにデータを消されにくくするよう頼む
+function requestPersistentStorage() {
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted()
+        .then(p => { if (!p) return navigator.storage.persist(); })
+        .catch(() => {});
+    }
+  } catch(e) {}
+}
+
 let syncPollTimer = null;
 function startSyncPolling() {
   if (syncPollTimer) clearInterval(syncPollTimer);
-  syncPollTimer = setInterval(() => { syncAndRender(); }, 30000);
+  syncPollTimer = setInterval(() => { refreshTxDate(); syncAndRender(); }, 30000);
 }
 function stopSyncPolling() {
   if (syncPollTimer) { clearInterval(syncPollTimer); syncPollTimer = null; }
@@ -1012,8 +1074,36 @@ let currentYear, currentMonth, selectedCatFilter = null;
 function initApp() {
   const now = new Date();
   currentYear = now.getFullYear(); currentMonth = now.getMonth() + 1;
-  document.getElementById('tx-date').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  txDateManualDay = null;
+  document.getElementById('tx-date').value = todayStr();
+  updateSubmitLabel();
   updateCategorySelect(); renderAll();
+}
+
+// ===== 記録の日付 =====
+// 手で日付を選んでいなければ、日付が変わったら自動で「今日」に合わせる
+// （開きっぱなしで夜中の0時を越えても、前の日の記録にならないように）
+let txDateManualDay = null; // 手で今日以外の日付を選んだら印を付ける（今日に戻すかログインし直すまで保つ）
+function refreshTxDate() {
+  const el = document.getElementById('tx-date');
+  if (!el) return;
+  const today = todayStr();
+  // 手で選んだ日付はそのまま（ボタンに「○/○として追加する」と出るので気づける）
+  if (!txDateManualDay && el.value !== today) el.value = today;
+  updateSubmitLabel();
+}
+function onTxDateChange() {
+  const el = document.getElementById('tx-date');
+  // 空にした時も「手で触った」扱い（勝手に今日で埋めず、いつもの入力エラーを出す）
+  txDateManualDay = (el.value !== todayStr()) ? todayStr() : null;
+  updateSubmitLabel();
+}
+// 今日以外の日付で記録する時は、ボタンに日付を出して気づけるようにする
+function updateSubmitLabel() {
+  const btn = document.getElementById('tx-submit-btn');
+  const el  = document.getElementById('tx-date');
+  if (!btn || !el) return;
+  btn.textContent = (el.value && el.value !== todayStr()) ? `${fmtDateJP(el.value)}として追加する` : '追加する';
 }
 
 function goToCurrentMonth() {
@@ -1033,14 +1123,52 @@ function changeMonth(d) {
   if (calTab && calTab.style.display !== 'none') renderCalendarTab(getData());
 }
 
-function updateCategorySelect() {
+// 記録欄のカテゴリ。ここ90日でよく使った順にボタンで並べる（中身は隠したselectに入れる）
+// keepOrder: 使っている最中はボタンの並びを動かさない（同期でカテゴリが増減した時だけ足し引きする）
+function updateCategorySelect(keepOrder) {
   const sel  = document.getElementById('tx-category');
+  const box  = document.getElementById('tx-cat-chips');
   const data = getData();
-  const cats = data.categories.expense;
+  const prev = sel.value;
+  const valid = data.categories.expense;
+  let cats;
+  const shown = box ? [...box.querySelectorAll('.cat-pick-btn')].map(b => b.dataset.cat) : [];
+  if (keepOrder && shown.length) {
+    cats = shown.filter(c => valid.includes(c)).concat(valid.filter(c => !shown.includes(c)));
+  } else {
+    const since = new Date(); since.setDate(since.getDate() - 89);
+    const sinceStr = `${since.getFullYear()}-${String(since.getMonth()+1).padStart(2,'0')}-${String(since.getDate()).padStart(2,'0')}`;
+    const today = todayStr();
+    const count = {};
+    data.transactions.forEach(t => { if (t.type === 'expense' && t.date >= sinceStr && t.date <= today) count[t.category] = (count[t.category] || 0) + 1; });
+    cats = valid
+      .map((c, i) => ({ c, i, n: count[c] || 0 }))
+      .sort((a, b) => b.n - a.n || a.i - b.i)
+      .map(x => x.c);
+  }
   sel.innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</option>`).join('');
+  if (cats.includes(prev)) sel.value = prev;
+  if (!box) return;
+  box.innerHTML = cats.map(c =>
+    `<button type="button" class="cat-pick-btn" data-cat="${escHtml(c)}">${escHtml(data.catIcons[c] || CAT_ICONS[c] || '')} ${escHtml(c)}</button>`
+  ).join('');
+  const mark = () => box.querySelectorAll('.cat-pick-btn').forEach(x => {
+    const on = x.dataset.cat === sel.value;
+    x.classList.toggle('active', on);
+    x.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  box.querySelectorAll('.cat-pick-btn').forEach(b => {
+    b.addEventListener('click', () => { sel.value = b.dataset.cat; mark(); });
+  });
+  mark();
 }
 
-function renderAll() {
+// 予算の入力欄を打ちかけ（未保存）かどうか。同期で欄を作り直して数字が消えないようにする
+let budgetInputsDirty = false;
+document.getElementById('budget-settings').addEventListener('input', () => { budgetInputsDirty = true; });
+
+function renderAll(opts) {
+  const fromSync = !!(opts && opts.fromSync);
   document.getElementById('month-label').textContent = `${currentYear}年${currentMonth}月`;
   const _now = new Date();
   const todayBtn = document.getElementById('today-btn');
@@ -1048,8 +1176,11 @@ function renderAll() {
   const data = getData();
   const txs = monthlyTxs(data);
   renderSummary(txs); renderTxList(txs, data);
-  renderBudget(txs, data); renderBudgetSettings(data);
-  renderWeeklyBreakdown();
+  renderBudget(txs, data);
+  // 相手の同期が届いた時は、入力中の欄を作り直さない
+  if (!(fromSync && budgetInputsDirty)) renderBudgetSettings(data);
+  const weeklyEl = document.getElementById('weekly-breakdown-list');
+  if (!(fromSync && weeklyEl && weeklyEl.contains(document.activeElement))) renderWeeklyBreakdown();
 }
 
 function monthlyTxs(data) {
@@ -1067,7 +1198,19 @@ function renderSummary(txs) {
   document.getElementById('total-budget').textContent  = '¥' + budget.toLocaleString();
   document.getElementById('total-expense').textContent = '¥' + exp.toLocaleString();
   const bal = budget - exp;
-  document.getElementById('total-balance').textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
+  const balEl = document.getElementById('total-balance');
+  balEl.textContent = (bal < 0 ? '-¥' : '¥') + Math.abs(bal).toLocaleString();
+  balEl.classList.toggle('minus', bal < 0);
+
+  // 予算をどれだけ使ったかの棒
+  const usedPct = budget > 0 ? Math.round(exp / budget * 100) : 0;
+  const bar = document.getElementById('summary-bar');
+  if (bar) {
+    bar.style.width = (exp > budget ? 100 : Math.min(usedPct, 100)) + '%';
+    bar.className = 'sum-bar' + (exp > budget ? ' over' : exp >= budget * 0.8 ? ' warn' : '');
+  }
+  const pctEl = document.getElementById('summary-pct');
+  if (pctEl) pctEl.textContent = budget > 0 ? `予算の ${usedPct}% を使用` : '予算が未設定です';
 
   // 今月を表示中のときだけ「1日あたり使える額」を出す
   const allowEl = document.getElementById('daily-allowance');
@@ -1117,18 +1260,18 @@ function renderTxList(txs, data) {
   const summaryHtml = `
     <div class="cat-filter-summary">
       <span>${summaryLabel}</span>
-      <span class="cat-filter-summary-amount" style="color:var(--danger);font-weight:700">-¥${totalExp.toLocaleString()}</span>
+      <span class="cat-filter-summary-amount" style="color:var(--text);font-weight:800">-¥${totalExp.toLocaleString()}</span>
     </div>`;
   el.innerHTML = chipsHtml + summaryHtml + sorted.map(t => `
     <div class="tx-item">
       <div class="tx-left">
         <span class="tx-cat-badge">${escHtml(data.catIcons[t.category] || CAT_ICONS[t.category] || '')}${escHtml(t.category)}</span>
         <span class="tx-note">${escHtml(t.note || '（メモなし）')}</span>
-        <span class="tx-meta">${fmtDateJP(t.date)} · ${escHtml(data.users[t.user]?.name || t.user)}</span>
+        <span class="tx-meta">${fmtDateJP(t.date)} · <span class="who-dot ${t.user === 'user2' ? 'user2' : 'user1'}"></span>${escHtml(data.users[t.user]?.name || t.user)}</span>
       </div>
       <div class="tx-right">
         <span class="tx-amount expense">-¥${t.amount.toLocaleString()}</span>
-        <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集">✏️</button>
+        <button class="edit-btn" onclick="openEditTxModal('${escHtml(t.id)}')" title="編集" aria-label="編集"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
         <button class="del-btn" onclick="deleteTx('${escHtml(t.id)}')" title="削除">✕</button>
       </div>
     </div>`).join('');
@@ -1187,16 +1330,20 @@ function renderBudgetSettings(data) {
   const mBudgets = getMonthBudgets(data, currentYear, currentMonth);
   const titleEl = document.getElementById('budget-settings-title');
   if (titleEl) titleEl.textContent = `${currentYear}年${currentMonth}月の予算設定`;
+  budgetInputsDirty = false;
   el.innerHTML = data.categories.expense.map((cat, i) => `
     <div class="form-row">
       <label>${escHtml(data.catIcons[cat]||CAT_ICONS[cat]||'')} ${escHtml(cat)}</label>
-      <input type="number" id="budget-idx-${i}" value="${mBudgets[cat] || 0}" min="0" />
+      <input type="number" id="budget-idx-${i}" data-budget-cat="${escHtml(cat)}" data-orig="${mBudgets[cat] || 0}" value="${mBudgets[cat] || 0}" min="0" />
     </div>`).join('');
 }
 
 // ===== 操作 =====
 function addTransaction() {
-  const date     = document.getElementById('tx-date').value;
+  // 開きっぱなしで日付が変わっていたら、今日に合わせてから記録する
+  const dateEl = document.getElementById('tx-date');
+  refreshTxDate();
+  const date     = dateEl.value;
   const amount   = parseInt(document.getElementById('tx-amount').value);
   const category = document.getElementById('tx-category').value;
   const note     = document.getElementById('tx-note').value.trim();
@@ -1226,16 +1373,24 @@ function deleteTx(id) {
 function saveBudgets() {
   const data = getData();
   const key = monthKey(currentYear, currentMonth);
-  if (!data.budgets[key] || typeof data.budgets[key] !== 'object') data.budgets[key] = {};
-  data.categories.expense.forEach((cat, i) => {
-    const el = document.getElementById('budget-idx-' + i);
-    if (el) data.budgets[key][cat] = parseInt(el.value) || 0;
+  // 最新の予算（相手の変更も入ったもの）を土台に、この画面で書き換えた欄だけ反映する
+  // （触っていない欄の古い数字で、相手の変更を上書きしないように。欄はカテゴリ名で対応づける）
+  const base = Object.assign({}, getMonthBudgets(data, currentYear, currentMonth));
+  data.categories.expense.forEach(cat => { if (!(cat in base)) base[cat] = 0; });
+  document.querySelectorAll('#budget-settings input[data-budget-cat]').forEach(el => {
+    const cat = el.dataset.budgetCat;
+    if (!data.categories.expense.includes(cat)) return; // 入力中に消されたカテゴリは保存しない
+    if (el.value !== el.dataset.orig) base[cat] = parseInt(el.value) || 0;
   });
+  data.budgets[key] = base;
+  // 週の設定も、この画面で変えた時だけ保存する（相手の変更を古い表示で戻さない）
   const wsEl = document.getElementById('week-start-select');
-  const ws = wsEl ? parseInt(wsEl.value) : 1;
-  if (ws >= 0 && ws <= 6) data.weekStart = ws;
+  if (wsEl && wsEl.value !== wsEl.dataset.orig) {
+    const ws = parseInt(wsEl.value);
+    if (ws >= 0 && ws <= 6) data.weekStart = ws;
+  }
   const cwsEl = document.getElementById('custom-week-starts-input');
-  if (cwsEl) {
+  if (cwsEl && cwsEl.value !== cwsEl.dataset.orig) {
     const raw = cwsEl.value.trim();
     if (raw === '') {
       data.customWeekStarts = null;
@@ -1245,6 +1400,8 @@ function saveBudgets() {
     }
   }
   saveData(data); renderAll();
+  if (wsEl) { wsEl.value = String(data.weekStart ?? 1); wsEl.dataset.orig = wsEl.value; }
+  if (cwsEl) { cwsEl.value = data.customWeekStarts && data.customWeekStarts.length > 0 ? data.customWeekStarts.join(',') : ''; cwsEl.dataset.orig = cwsEl.value; }
   const bmsg = document.getElementById('budget-save-msg');
   if (bmsg) { bmsg.className = 'msg-area text-success'; bmsg.textContent = '予算を保存しました'; }
   schedulePush();
@@ -1260,9 +1417,9 @@ function showTab(id) {
     renderSyncSettings();
     const data = getData();
     const ws = document.getElementById('week-start-select');
-    if (ws) ws.value = String(data.weekStart ?? 1);
+    if (ws) { ws.value = String(data.weekStart ?? 1); ws.dataset.orig = ws.value; }
     const cwsEl = document.getElementById('custom-week-starts-input');
-    if (cwsEl) cwsEl.value = data.customWeekStarts && data.customWeekStarts.length > 0 ? data.customWeekStarts.join(',') : '';
+    if (cwsEl) { cwsEl.value = data.customWeekStarts && data.customWeekStarts.length > 0 ? data.customWeekStarts.join(',') : ''; cwsEl.dataset.orig = cwsEl.value; }
   }
 }
 
@@ -1331,10 +1488,8 @@ function updateUserName(uid) {
   const label = uid === 'user1' ? '👤 ユーザー1' : '👤 ユーザー2';
   const titleEl = document.getElementById('user-title-' + uid);
   if (titleEl) titleEl.textContent = label + '（現在: ' + name + '）';
-  if (uid === currentUser) {
-    document.getElementById('current-user-label').textContent = name;
-    document.getElementById('btn-' + uid).textContent = '👤 ' + name;
-  }
+  if (uid === currentUser) document.getElementById('current-user-label').textContent = name;
+  document.getElementById('btn-' + uid).textContent = '👤 ' + name;
 }
 
 // ===== カレンダー =====
@@ -1383,7 +1538,7 @@ function renderDaySummary(data) {
     <div class="day-summary-header">
       <span class="day-summary-date">${label}</span>
       <span class="day-summary-totals">
-        ${exp > 0 ? `<span style="color:var(--danger)">-¥${exp.toLocaleString()}</span>` : ''}
+        ${exp > 0 ? `<span style="color:var(--text)">-¥${exp.toLocaleString()}</span>` : ''}
       </span>
     </div>
     ${txs.map(t => `
@@ -1395,7 +1550,7 @@ function renderDaySummary(data) {
             ${t.note ? `<div class="day-summary-note">${escHtml(t.note)}</div>` : ''}
           </div>
         </div>
-        <span class="day-summary-amt" style="color:var(--danger)">
+        <span class="day-summary-amt" style="color:var(--text)">
           -¥${t.amount.toLocaleString()}
         </span>
       </div>`).join('')}`;
@@ -1546,12 +1701,13 @@ function renderWeeklyBreakdown() {
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
         <span style="font-size:.8rem;color:var(--muted)">支出</span>
-        <span style="font-size:.88rem;font-weight:700;color:var(--danger)">¥${spent.toLocaleString()}</span>
+        <span style="font-size:.88rem;font-weight:700;color:var(--text)">¥${spent.toLocaleString()}</span>
         <span style="font-size:.8rem;color:var(--muted)">/</span>
         <span style="font-size:.8rem;color:var(--muted)">予算</span>
         <span style="display:flex;align-items:center;gap:3px">
           <span style="font-size:.82rem;color:var(--muted)">¥</span><input type="number" min="0" step="1000"
             value="${wBudget}"
+            data-orig="${wBudget}"
             data-override-key="${escHtml(overrideKey)}"
             data-week-key="${escHtml(weekKey)}"
             style="width:96px;padding:4px 6px;font-size:.85rem;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);text-align:right;font-family:inherit"
@@ -1564,13 +1720,18 @@ function renderWeeklyBreakdown() {
     </div>`;
   }).join('');
 
+  // 実際に数字を書き換えた時だけ保存する（欄を選んで離れただけで、相手の変更を古い数字で戻さない）
   el.querySelectorAll('input[data-week-key]').forEach(input => {
-    input.addEventListener('change', () => {
+    const onCommit = () => {
+      if (input.value === input.dataset.orig) {
+        // 未編集のまま離れた：入力中に届いた相手の変更があれば表示し直す
+        setTimeout(() => { if (!el.contains(document.activeElement)) renderWeeklyBreakdown(); }, 0);
+        return;
+      }
       saveWeekBudget(input.dataset.overrideKey, input.dataset.weekKey, input.value);
-    });
-    input.addEventListener('blur', () => {
-      saveWeekBudget(input.dataset.overrideKey, input.dataset.weekKey, input.value);
-    });
+    };
+    input.addEventListener('change', onCommit);
+    input.addEventListener('blur', onCommit);
   });
 }
 
@@ -1874,15 +2035,23 @@ function isAppVisible() {
 
 async function syncAndRender() {
   const res = await syncNow();
-  if (res.changed && isAppVisible()) renderAll();
+  if (res.changed && isAppVisible()) {
+    updateCategorySelect(true); // 相手がカテゴリを増やした・消した時に記録欄のボタンも合わせる
+    renderAll({ fromSync: true });
+  }
   return res;
 }
+
+// アプリに戻ってきたら、記録の日付を今日に合わせ直す（同期の有無に関係なく）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && isAppVisible()) refreshTxDate();
+});
 
 // アプリに戻ってきたらすぐ同期、閉じる/裏に回るときは未送信分をすぐ送る
 document.addEventListener('visibilitychange', () => {
   if (!getSyncConfig().gistId) return;
   if (document.visibilityState === 'hidden') {
-    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; syncNow(); }
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; syncAndRender(); }
   } else if (isAppVisible()) {
     syncAndRender();
   }
@@ -2083,6 +2252,7 @@ function importData(event) {
 }
 
 setupSyncFromHash();
+restoreLastUser();
 
 // ===== PWA: サービスワーカー登録 =====
 if ('serviceWorker' in navigator) {
